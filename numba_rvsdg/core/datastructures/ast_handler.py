@@ -22,6 +22,7 @@ class ASTHandler:
         self.look_ahead_index = 0
         self.blocks = {}
         self.current_block = []
+        self.if_stack = []
 
     def process(self) -> SCFG:
         """Create an SCFG from a Python function. """
@@ -33,13 +34,13 @@ class ASTHandler:
         assert isinstance(self.queue[0], ast.FunctionDef)
         # expand the function def
         self.handle_function_def(self.queue.popleft())
-        # insert final return None if no return at end of
+        # insert final return None if no return at end of function
         if not isinstance(self.queue[-1], ast.Return):
             self.queue.append(ast.Return(None))
         # iterate over program
         while self.queue:
             print(self.queue, self.blocks, self.current_block, self.block_index)
-            #breakpoint()
+            breakpoint()
             self.handle_ast_node(self.queue.popleft())
         #else:
         #    if self.current_block:
@@ -58,7 +59,7 @@ class ASTHandler:
         elif isinstance(node, ast.Return):
             self.handle_return(node)
         elif isinstance(node, ast.If):
-            self.handle_if(node)
+            self.handle_if02(node)
         elif isinstance(node, ast.While):
             self.handle_while(node)
         elif isinstance(node, ast.For):
@@ -66,11 +67,33 @@ class ASTHandler:
         elif isinstance(node, str):
             if node == "ENDFOR":
                 self.new_block()
+            elif node.startswith("ENDTHEN") or node.startswith("ENDELSE"):
+                index = int(node[7:])
+                if self.current_block and isinstance(self.current_block[-1], ast.Return):
+                    self.new_terminating_block(index)
+                else:
+                    self.new_fallthrough_block(index, self.if_stack[-1])
             elif node.startswith("ENDIF"):
                 index = int(node[5:])
-                self.new_block(index)
+                target = self.if_stack.pop()
+                assert index == target
+                self.new_fallthrough_block(index, self.if_stack[-1] if
+                                           self.if_stack else self.block_index)
         else:
             raise NotImplementedError(f"Node type {node} not implemented")
+
+    def new_terminating_block(self, index:int):
+        self.blocks[str(index)] = PythonASTBlock(
+            name=str(index),
+            tree=self.current_block)
+        self.current_block = []
+
+    def new_fallthrough_block(self, index:int, target:int):
+        self.blocks[str(index)] = PythonASTBlock(
+            name=str(index),
+            _jump_targets=((str(target),)),
+            tree=self.current_block)
+        self.current_block = []
 
     def new_block(self, index: int) -> None:
         """Create a new block. """
@@ -81,7 +104,7 @@ class ASTHandler:
         else:
             self.blocks[str(index)] = PythonASTBlock(
                 name=str(index),
-                _jump_targets=((str(self.block_index-1,))),
+                _jump_targets=(str(self.if_stack[-1])),
                 tree=self.current_block)
         self.current_block = []
 
@@ -124,14 +147,11 @@ class ASTHandler:
     def handle_return(self, node: ast.Return) -> None:
         """Handle a return statement. """
         self.current_block.append(node)
-        if (len(self.queue) >= 1
-                and isinstance(self.queue[0], str)
-                and self.queue[0].startswith("ENDIF")):
-            index = int(self.queue.popleft()[5:])
+        if len(self.queue) >= 1:
+            pass
         else:
             index = self.block_index
-            self.block_index += 1
-        self.new_block(index)
+            self.new_block(self.block_index)
 
     def handle_for(self, node: ast.For) -> None:
         """Handle a for loop. """
@@ -160,6 +180,27 @@ class ASTHandler:
             self.queue.extend(node.orelse)
             self.queue.append(f"ENDIF{f}")
 
+    def handle_if02(self, node: ast.If) -> None:
+        this_index = self.block_index
+        then_index = self.block_index + 1
+        else_index = self.block_index + 2
+        enif_index = self.block_index + 3
+        self.block_index += 4
+        self.if_stack.extend([enif_index])
+        self.queue.appendleft(f"ENDIF{enif_index}")
+        self.queue.appendleft(f"ENDELSE{else_index}")
+        self.queue.extendleft(node.orelse[::-1])
+        self.queue.appendleft(f"ENDTHEN{then_index}")
+        self.queue.extendleft(node.body[::-1])
+
+        self.current_block.append(node.test)
+        name = str(this_index)
+        self.blocks[name] = PythonASTBlock(
+            name=name,
+            _jump_targets=(str(then_index),
+                           str(else_index)),
+            tree=self.current_block)
+        self.current_block = []
 
 def acc():
     r = 0
@@ -235,8 +276,9 @@ def branch04(x:int, y:int, a: int, b:int) -> None:
 #    return 0
 
 
-h = ASTHandler(branch03)
+h = ASTHandler(branch04)
 s = h.process()
 #breakpoint()
 from numba_rvsdg.rendering.rendering import render_scfg
 render_scfg(s)
+
