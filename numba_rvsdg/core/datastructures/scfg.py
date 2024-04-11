@@ -238,7 +238,11 @@ class SCFG(Sized):
             over the given view.
         """
         # initialise housekeeping datastructures
-        to_visit, seen = [self.find_head()], []
+        breakpoint()
+        try:
+            to_visit, seen = [self.find_head()], []
+        except:
+            to_visit, seen = ["0"], []
         while to_visit:
             # get the next name on the list
             name = to_visit.pop(0)

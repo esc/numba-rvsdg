@@ -107,7 +107,10 @@ class BaseRenderer:
                 continue
             src_block = find_base_header(src_block)
             for dst_name in src_block.jump_targets:
-                dst_name = find_base_header(blocks[dst_name]).name
+                try:
+                    dst_name = find_base_header(blocks[dst_name]).name
+                except KeyError:
+                    continue
                 if dst_name in blocks.keys():
                     self.g.edge(str(src_block.name), str(dst_name))
                 else:

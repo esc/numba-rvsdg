@@ -6,6 +6,7 @@ from collections import deque
 
 from numba_rvsdg.core.datastructures.scfg import SCFG
 from numba_rvsdg.core.datastructures.basic_block import PythonASTBlock
+from numba_rvsdg.rendering.rendering import render_scfg
 
 
 class ASTHandler:
@@ -22,6 +23,7 @@ class ASTHandler:
         self.blocks = {}
         self.current_index = 0
         self.current_instructions = []
+        self.if_stack = []
 
     def process(self) -> SCFG:
         """Create an SCFG from a Python function. """
@@ -134,11 +136,13 @@ class ASTHandler:
 #        self.block_index += 1
 #        return return_value
 
-    def seal(self, index: int, instructions: list[ast.AST],
+    def seal(self, index: int,
+             instructions: list[ast.AST]=None,
              jump_targets: tuple[int, int]=tuple()):
         if str(index) in self.blocks:
-            #breakpoint()
-            pass
+            breakpoint()
+        if not instructions:
+            instructions = []
 
         block = PythonASTBlock(
             name=str(index),
@@ -166,7 +170,7 @@ class ASTHandler:
     def handle_return(self, node: ast.Return) -> None:
         """Handle a return statement. """
         self.current_instructions.append(node)
-        self.seal(self.block_index,
+        self.seal(self.current_index,
                   self.current_instructions)
 
     def handle_for(self, node: ast.For) -> None:
@@ -184,25 +188,37 @@ class ASTHandler:
         then_index = self.block_index
         else_index = self.block_index + 1
         enif_index = self.block_index + 2
-        self.block_index += 2
+        self.block_index += 3
         self.seal(this_index, self.current_instructions,
                   (then_index, else_index))
+        self.if_stack.append(enif_index)
 
         self.open(then_index)
         self.codegen(node.body)
-        if self.current_instructions and isinstance(self.current_instructions[-1], ast.Return):
-            self.seal(then_index, self.current_instructions)
-        elif self.current_instructions:
+        #if self.current_instructions and isinstance(self.current_instructions[-1], ast.Return):
+        #    self.seal(then_index, self.current_instructions)
+        #elif self.current_instructions:
+        #    self.seal(then_index, self.current_instructions, (enif_index,))
+        if self.current_instructions:
             self.seal(then_index, self.current_instructions, (enif_index,))
 
         self.open(else_index)
         self.codegen(node.orelse)
-        if self.current_instructions and isinstance(self.current_instructions[-1], ast.Return):
-            self.seal(else_index, self.current_instructions)
-        elif self.current_instructions:
+        #if self.current_instructions and isinstance(self.current_instructions[-1], ast.Return):
+        #    self.seal(else_index, self.current_instructions)
+        #elif self.current_instructions:
+        #    self.seal(else_index, self.current_instructions, (enif_index,))
+        if self.current_instructions:
             self.seal(else_index, self.current_instructions, (enif_index,))
-
+        self.if_stack.pop()
+        if self.if_stack:
+            self.seal(enif_index, jump_targets=(self.if_stack[-1],))
         self.open(enif_index)
+
+    def render(self):
+        s = SCFG(graph=self.blocks)
+        render_scfg(s)
+
 
 
 #    def handle_if(self, node: ast.If) -> None:
@@ -282,16 +298,17 @@ def branch03(a: int, b:int) -> None:
 
 def branch04(x:int, y:int, a: int, b:int) -> None:
     if x < 10:
+        z = 2
         if y < 5:
             y = a - b
         else:
             y = 2 * a
     else:
-        y = b - a
-        if y < 5:
+        z = 3
+        if y < 15:
             y = b - a
         else:
-            y = 2 * b
+            y = b ** 2
     return y
 
 #def branch02(a: int, b:int) -> None:
@@ -335,6 +352,5 @@ def branch04(x:int, y:int, a: int, b:int) -> None:
 h = ASTHandler(branch04)
 s = h.process()
 #breakpoint()
-from numba_rvsdg.rendering.rendering import render_scfg
 render_scfg(s)
 
