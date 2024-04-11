@@ -1,12 +1,12 @@
 import ast
 import inspect
 from typing import Callable
-from collections import deque
 
 
 from numba_rvsdg.core.datastructures.scfg import SCFG
 from numba_rvsdg.core.datastructures.basic_block import PythonASTBlock
 from numba_rvsdg.rendering.rendering import render_scfg
+
 
 class WriteableBasicBlock:
     """ A basic block that can be written to.
@@ -15,14 +15,15 @@ class WriteableBasicBlock:
 
     """
     def __init__(self, name: str,
-                 instructions: list[ast.AST]=None,
-                 jump_targets: tuple[str, str]=None) -> None:
+                 instructions: list[ast.AST] = None,
+                 jump_targets: tuple[str, str] = None) -> None:
         self.name = name
         self.instructions = [] if instructions is None else instructions
         self.jump_targets = () if jump_targets is None else jump_targets
 
 
-def convert(blocks: dict[str, WriteableBasicBlock]) -> dict[str, PythonASTBlock]:
+def convert(blocks: dict[str, WriteableBasicBlock]
+            ) -> dict[str, PythonASTBlock]:
     """ Convert CFG of WriteableBasicBlocks to CFG of PythonASTBlocks.  """
     new_blocks = {}
     for v in blocks.values():
@@ -40,24 +41,33 @@ class ASTHandler:
     """
 
     def __init__(self, code: Callable) -> None:
+        # Source code to convert
         self.code = code
+        # Monotonically increasing block index
         self.block_index = 1
+        # Dict mapping block indices as strings to WriteableBasicBlocks
+        # (This is the datastructure to hold the CFG.)
         self.blocks = {}
-        self.current_index = 0
-        self.current_instructions = []
+        # If-stack to remember if-nesting
         self.if_stack = []
-        self.current_block = WriteableBasicBlock(name=str(self.current_index))
-        self.blocks[str(self.current_index)] = self.current_block
+        # Initialize first (genesis) block, assume it's named zero
+        self.current_block = WriteableBasicBlock(name="0")
+        # Add first block to CFG
+        self.blocks["0"] = self.current_block
 
     def process(self) -> SCFG:
         """Create an SCFG from a Python function. """
-        # convert source code into AST
+        # Convert source code into AST
         tree = ast.parse(inspect.getsource(self.code)).body
-        # run recrisive code generation
+        # Assert that the code handed in was a function, we can only convert
+        # functions.
+        assert isinstance(tree[0], ast.FunctionDef)
+        # Run recrisive code generation
         self.codegen(tree)
-        # add last block to CFG
+        # Add last block to CFG, it will be dangling when code genaration is
+        # complete
         self.blocks[self.current_block.name] = self.current_block
-        # create SCFG using PythonASTBlocks
+        # Create SCFG using PythonASTBlocks and return
         return SCFG(graph=convert(self.blocks))
 
     def codegen(self, tree: list[ast.AST]) -> None:
@@ -86,6 +96,7 @@ class ASTHandler:
 
     def handle_function_def(self, node: ast.FunctionDef) -> None:
         """Handle a function definition. """
+        # Insert implicit return None, if the function isn't terminated
         if not isinstance(node.body[-1], ast.Return):
             node.body.append(ast.Return(None))
         self.codegen(node.body)
@@ -96,21 +107,21 @@ class ASTHandler:
 
     def handle_return(self, node: ast.Return) -> None:
         """Handle a return statement. """
+        # Update current block to include return statement
         self.current_block.instructions.append(node)
+        # Terminate the block by clearing the jump targets
         self.current_block.jump_targets = ()
 
     def handle_if(self, node: ast.If) -> None:
         """ Handle if statement. """
-
-        # Emit comparison value to current block
-        self.current_block.instructions.append(node.test)
-
         # Preallocate block indices for then, else, and end-if
         then_index = self.block_index
         else_index = self.block_index + 1
         enif_index = self.block_index + 2
         self.block_index += 3
 
+        # Emit comparison value to current block
+        self.current_block.instructions.append(node.test)
         # Setup jump targets for current block
         self.current_block.jump_targets = (str(then_index), str(else_index))
         # Add block to CFG
@@ -133,7 +144,7 @@ class ASTHandler:
         self.blocks[str(else_index)] = self.current_block
         self.codegen(node.orelse)
 
-        # All recursive calls have been made, so we can now pop the end-if.
+        # All recursive calls have been made, so we can now pop the if-stack
         self.if_stack.pop()
         # Create a new block for the end-if
         self.current_block = WriteableBasicBlock(name=str(enif_index))
@@ -157,12 +168,15 @@ class ASTHandler:
 def solo_return():
     return 1
 
+
 def solo_assign():
     x = 1
+
 
 def assign_return():
     x = 1
     return x
+
 
 def acc():
     r = 0
@@ -170,37 +184,46 @@ def acc():
         r = r + 1
     return r
 
-def branch01(a: int, b:int) -> None:
+
+def branch01(x: int) -> None:
     if x < 10:
         return 1
     return 2
 
-def branch02(a: int, b:int) -> None:
+
+def branch02(x: int, y: int, a: int, b: int) -> None:
     if x < 10:
         y = a + b
     z = a - b
 
-def branch03(a: int, b:int) -> None:
+
+def branch03(x: int, a: int, b: int) -> None:
     if x < 10:
         return
     else:
-        y = b -c
+        y = b - a
     return y
 
-def branch04(x:int, y:int, a: int, b:int) -> None:
+
+def branch04(x: int, y: int, a: int, b: int) -> None:
     if x < 10:
+        z = 1
         if y < 5:
             y = a - b
         else:
             y = 2 * a
+        z = 2
     else:
+        z = 3
         if y < 15:
             y = b - a
         else:
             y = b ** 2
-    return y
+        z = 4
+    return y, z
 
-def branch05(x:int, y:int, a: int, b:int) -> None:
+
+def branch05(x: int, y: int, a: int, b: int) -> None:
     if x < 10:
         if y < 5:
             y = a - b
@@ -252,6 +275,5 @@ def branch05(x:int, y:int, a: int, b:int) -> None:
 
 h = ASTHandler(branch05)
 s = h.process()
-#breakpoint()
 render_scfg(s)
 
