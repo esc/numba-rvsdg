@@ -38,12 +38,15 @@ class ASTHandler:
         self.current_index = 0
         self.current_instructions = []
         self.if_stack = []
+        self.current_block = WriteableBasicBlock(name=str(self.current_index))
+        self.blocks[str(self.current_index)] = self.current_block
 
     def process(self) -> SCFG:
         """Create an SCFG from a Python function. """
         # convert source code into AST
         tree = ast.parse(inspect.getsource(self.code)).body
         self.codegen(tree)
+        self.blocks[self.current_block.name] = self.current_block
         # # initialize queue
         # self.queue = deque(tree.body)
         # # check that this is a function def
@@ -149,11 +152,23 @@ class ASTHandler:
 #        self.block_index += 1
 #        return return_value
 
+    #def handle_for(self, node: ast.For) -> None:
+    #    """Handle a for loop. """
+    #    self.new_block()
+    #    self.current_block.append(node)
+    #    self.queue.extend(node.body)
+    #    self.queue.append("ENDFOR")
+
+    #def handle_expr(self, node: ast.Expr) -> None:
+    #    """Handle an expression. """
+
+
     def seal(self, index: int,
              instructions: list[ast.AST]=None,
              jump_targets: tuple[int, int]=tuple()):
         if str(index) in self.blocks:
-            breakpoint()
+            #breakpoint()
+            pass
         if not instructions:
             instructions = []
 
@@ -175,39 +190,46 @@ class ASTHandler:
 
     def handle_assign(self, node: ast.Assign) -> None:
         """Handle an assignment. """
-        self.current_instructions.append(node)
-
-    def handle_expr(self, node: ast.Expr) -> None:
-        """Handle an expression. """
+        self.current_block.instructions.append(node)
 
     def handle_return(self, node: ast.Return) -> None:
         """Handle a return statement. """
-        self.current_instructions.append(node)
-        self.seal(self.current_index,
-                  self.current_instructions)
-
-    def handle_for(self, node: ast.For) -> None:
-        """Handle a for loop. """
-        self.new_block()
-        self.current_block.append(node)
-        self.queue.extend(node.body)
-        self.queue.append("ENDFOR")
+        self.current_block.instructions.append(node)
+        self.current_block.jump_targets = ()
 
     def handle_if(self, node: ast.If) -> None:
-        breakpoint()
+        #breakpoint()
         # Emit comparison value
-        self.current_instructions.append(node.test)
-        this_index = self.current_index
+        self.current_block.instructions.append(node.test)
+
         then_index = self.block_index
         else_index = self.block_index + 1
         enif_index = self.block_index + 2
         self.block_index += 3
-        self.seal(this_index, self.current_instructions,
-                  (then_index, else_index))
+
+        self.current_block.jump_targets = (str(then_index), str(else_index))
+        self.blocks[self.current_block.name] = self.current_block
+
         self.if_stack.append(enif_index)
 
-        self.open(then_index)
+        self.current_block = WriteableBasicBlock(name=str(then_index))
+        self.current_block.jump_targets = (str(enif_index),)
+        self.blocks[str(then_index)] = self.current_block
         self.codegen(node.body)
+
+        self.current_block = WriteableBasicBlock(name=str(else_index))
+        self.current_block.jump_targets = (str(enif_index),)
+        self.blocks[str(else_index)] = self.current_block
+        self.codegen(node.orelse)
+
+        self.if_stack.pop()
+        self.current_block = WriteableBasicBlock(name=str(enif_index))
+        self.blocks[self.current_block.name] = self.current_block
+        if self.if_stack:
+            self.current_block.jump_targets = str(self.if_stack[-1])
+
+        return
+
         #if self.current_instructions and isinstance(self.current_instructions[-1], ast.Return):
         #    self.seal(then_index, self.current_instructions)
         #elif self.current_instructions:
@@ -304,25 +326,35 @@ def branch02(a: int, b:int) -> None:
 
 def branch03(a: int, b:int) -> None:
     if x < 10:
-        y = a -b
+        return
     else:
         y = b -c
     return y
 
 def branch04(x:int, y:int, a: int, b:int) -> None:
     if x < 10:
-        z = 2
         if y < 5:
             y = a - b
         else:
             y = 2 * a
     else:
-        z = 3
         if y < 15:
             y = b - a
         else:
             y = b ** 2
     return y
+
+def branch05(x:int, y:int, a: int, b:int) -> None:
+    if x < 10:
+        if y < 5:
+            y = a - b
+    else:
+        if y < 15:
+            y = b - a
+        else:
+            return
+    return y
+
 
 #def branch02(a: int, b:int) -> None:
 #    if x < 10:
@@ -362,7 +394,7 @@ def branch04(x:int, y:int, a: int, b:int) -> None:
 #    return 0
 
 
-h = ASTHandler(branch04)
+h = ASTHandler(branch05)
 s = h.process()
 #breakpoint()
 render_scfg(s)
