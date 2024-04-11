@@ -25,11 +25,11 @@ class WriteableBasicBlock:
 def convert(blocks: dict[str, WriteableBasicBlock]
             ) -> dict[str, PythonASTBlock]:
     """ Convert CFG of WriteableBasicBlocks to CFG of PythonASTBlocks.  """
-    new_blocks = {}
-    for v in blocks.values():
-        new_blocks[v.name] = PythonASTBlock(
-            v.name, tree=v.instructions, _jump_targets=v.jump_targets)
-    return new_blocks
+    return {v.name: PythonASTBlock(
+        v.name,
+        tree=v.instructions,
+        _jump_targets=v.jump_targets)
+        for v in blocks.values()}
 
 
 class ASTHandler:
@@ -50,10 +50,9 @@ class ASTHandler:
         self.blocks = {}
         # If-stack to remember if-nesting
         self.if_stack = []
-        # Initialize first (genesis) block, assume it's named zero
-        self.current_block = WriteableBasicBlock(name="0")
-        # Add first block to CFG
-        self.blocks["0"] = self.current_block
+        # Initialize first (genesis) block, assume it's named zero and addit to
+        # the CFG
+        self.blocks["0"] = self.current_block = WriteableBasicBlock(name="0")
 
     def process(self) -> SCFG:
         """Create an SCFG from a Python function. """
@@ -138,6 +137,7 @@ class ASTHandler:
             WriteableBasicBlock(
                 name=str(then_index),
                 jump_targets=(str(enif_index),))
+        # Recursively process then branch
         self.codegen(node.body)
 
         # Create a new block for the else branch
@@ -146,6 +146,7 @@ class ASTHandler:
             WriteableBasicBlock(
                 name=str(else_index),
                 jump_targets=(str(enif_index),))
+        # Recursively process else branch
         self.codegen(node.orelse)
 
         # All recursive calls have been made, so we can now pop the if-stack
