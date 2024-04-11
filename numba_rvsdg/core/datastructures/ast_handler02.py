@@ -16,10 +16,13 @@ class WriteableBasicBlock:
     """
     def __init__(self, name: str,
                  instructions: list[ast.AST] = None,
-                 jump_targets: tuple[str, str] = None) -> None:
+                 jump_targets: list[str, str] = None) -> None:
         self.name = name
         self.instructions = [] if instructions is None else instructions
-        self.jump_targets = () if jump_targets is None else jump_targets
+        self.jump_targets = [] if jump_targets is None else jump_targets
+
+    def __repr__(self):
+        return f"WriteableBasicBlock({self.name}, {self.instructions}, {self.jump_targets})"
 
 
 def convert(blocks: dict[str, WriteableBasicBlock]
@@ -28,7 +31,7 @@ def convert(blocks: dict[str, WriteableBasicBlock]
     return {v.name: PythonASTBlock(
         v.name,
         tree=v.instructions,
-        _jump_targets=v.jump_targets)
+        _jump_targets=tuple(v.jump_targets))
         for v in blocks.values()}
 
 
@@ -66,6 +69,8 @@ class ASTHandler:
         # Add last block to CFG, it will be dangling when code genaration is
         # complete
         self.blocks[self.current_block.name] = self.current_block
+        # prune empty nodes
+        self.prune_empty()
         # Create SCFG using PythonASTBlocks and return
         return SCFG(graph=convert(self.blocks))
 
@@ -109,7 +114,7 @@ class ASTHandler:
         # Update current block to include return statement
         self.current_block.instructions.append(node)
         # Terminate the block by clearing the jump targets
-        self.current_block.jump_targets = ()
+        self.current_block.jump_targets = []
 
     def handle_if(self, node: ast.If) -> None:
         """ Handle if statement. """
@@ -122,7 +127,7 @@ class ASTHandler:
         # Emit comparison value to current block
         self.current_block.instructions.append(node.test)
         # Setup jump targets for current block
-        self.current_block.jump_targets = (str(then_index), str(else_index))
+        self.current_block.jump_targets = [str(then_index), str(else_index)]
         # Add block to CFG
         self.blocks[self.current_block.name] = self.current_block
 
@@ -136,7 +141,7 @@ class ASTHandler:
             self.current_block = \
             WriteableBasicBlock(
                 name=str(then_index),
-                jump_targets=(str(enif_index),))
+                jump_targets=[str(enif_index)])
         # Recursively process then branch
         self.codegen(node.body)
 
@@ -145,7 +150,7 @@ class ASTHandler:
             self.current_block = \
             WriteableBasicBlock(
                 name=str(else_index),
-                jump_targets=(str(enif_index),))
+                jump_targets=[str(enif_index)])
         # Recursively process else branch
         self.codegen(node.orelse)
 
@@ -159,8 +164,28 @@ class ASTHandler:
             self.current_block = \
             WriteableBasicBlock(
                 name=str(enif_index),
-                jump_targets=str(self.if_stack[-1]) if self.if_stack else ()
+                jump_targets=[str(self.if_stack[-1])] if self.if_stack else ()
             )
+
+    def prune_empty(self):
+        for i in list(self.blocks.values()):
+            if not i.instructions:
+                self.blocks.pop(i.name)
+                # Empty nodes can only have a single jump target.
+                it = i.jump_targets[0]
+                # iterate over the nodes looking for nodes that point to the
+                # removed node
+                for j in list(self.blocks.values()):
+                    if len(j.jump_targets) == 0:
+                        continue
+                    elif len(j.jump_targets) == 1:
+                        if j.jump_targets[0] == i.name:
+                            j.jump_targets[0] = it
+                    elif len(j.jump_targets) == 2:
+                        if j.jump_targets[0] == i.name:
+                            j.jump_targets[0] = it
+                        elif j.jump_targets[1] == i.name:
+                            j.jump_targets[1] = it
 
     def render(self):
         """ Render the CFG contained in this handler as a SCFG.
@@ -281,6 +306,6 @@ def branch05(x: int, y: int, a: int, b: int) -> None:
 #    return 0
 
 
-h = ASTHandler(branch04)
+h = ASTHandler(branch05)
 s = h.process()
 render_scfg(s)
