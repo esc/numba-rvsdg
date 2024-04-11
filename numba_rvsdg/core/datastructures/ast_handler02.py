@@ -8,6 +8,20 @@ from numba_rvsdg.core.datastructures.scfg import SCFG
 from numba_rvsdg.core.datastructures.basic_block import PythonASTBlock
 from numba_rvsdg.rendering.rendering import render_scfg
 
+class WriteableBasicBlock:
+
+    def __init__(self, name, instructions=None, jump_targets=None) -> None:
+        self.name = name
+        self.instructions = [] if instructions is None else instructions
+        self.jump_targets = () if jump_targets is None else jump_targets
+
+
+def convert(blocks):
+    new_blocks = {}
+    for v in blocks.values():
+        new_blocks[v.name] = PythonASTBlock(
+            v.name, tree=v.instructions, _jump_targets=v.jump_targets)
+    return new_blocks
 
 class ASTHandler:
     """ASTHandler class.
@@ -44,8 +58,7 @@ class ASTHandler:
         #     #print(self.queue, self.blocks, self.current_block, self.block_index)
         #     #breakpoint()
         #     self.handle_ast_node(self.queue.popleft())
-
-        return SCFG(graph=self.blocks)
+        return SCFG(graph=convert(self.blocks))
 
     def codegen(self, tree: list[ast.AST]) -> None:
         """Generate code from a list of AST nodes. """
@@ -144,10 +157,10 @@ class ASTHandler:
         if not instructions:
             instructions = []
 
-        block = PythonASTBlock(
+        block = WriteableBasicBlock(
             name=str(index),
-            _jump_targets=tuple([str(i) for i in jump_targets]),
-            tree=instructions)
+            instructions=instructions,
+            jump_targets=tuple([str(i) for i in jump_targets]))
         self.blocks[str(index)] = block
 
     def open(self, index: int) -> None:
