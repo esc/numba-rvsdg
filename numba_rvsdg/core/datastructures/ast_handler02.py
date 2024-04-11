@@ -133,26 +133,33 @@ class ASTHandler:
         self.if_stack.append(enif_index)
 
         # Create a new block for the then branch
-        self.current_block = WriteableBasicBlock(name=str(then_index))
-        self.current_block.jump_targets = (str(enif_index),)
-        self.blocks[str(then_index)] = self.current_block
+        self.blocks[str(then_index)] = \
+            self.current_block = \
+            WriteableBasicBlock(
+                name=str(then_index),
+                jump_targets=(str(enif_index),))
         self.codegen(node.body)
 
         # Create a new block for the else branch
-        self.current_block = WriteableBasicBlock(name=str(else_index))
-        self.current_block.jump_targets = (str(enif_index),)
-        self.blocks[str(else_index)] = self.current_block
+        self.blocks[str(else_index)] = \
+            self.current_block = \
+            WriteableBasicBlock(
+                name=str(else_index),
+                jump_targets=(str(enif_index),))
         self.codegen(node.orelse)
 
         # All recursive calls have been made, so we can now pop the if-stack
         self.if_stack.pop()
-        # Create a new block for the end-if
-        self.current_block = WriteableBasicBlock(name=str(enif_index))
-        self.blocks[self.current_block.name] = self.current_block
-        # If there are any elements on the if stack, we need to update the jump
-        # targets of the current end-if block.
-        if self.if_stack:
-            self.current_block.jump_targets = str(self.if_stack[-1])
+
+        # Create a new block for the end-if. If there are any elements on the
+        # if stack, we need to fixup the jump targets of the current end-if
+        # block.
+        self.blocks[str(enif_index)] = \
+            self.current_block = \
+            WriteableBasicBlock(
+                name=str(enif_index),
+                jump_targets=str(self.if_stack[-1]) if self.if_stack else ()
+            )
 
     def render(self):
         """ Render the CFG contained in this handler as a SCFG.
@@ -273,7 +280,6 @@ def branch05(x: int, y: int, a: int, b: int) -> None:
 #    return 0
 
 
-h = ASTHandler(branch05)
+h = ASTHandler(branch04)
 s = h.process()
 render_scfg(s)
-
