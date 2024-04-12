@@ -21,7 +21,7 @@ class WriteableBasicBlock:
         self.instructions = [] if instructions is None else instructions
         self.jump_targets = [] if jump_targets is None else jump_targets
 
-    def set_jump_targets(self, *indices: list[int]) -> None:
+    def set_jump_targets(self, *indices: tuple[int]) -> None:
         self.jump_targets = [str(a) for a in indices]
 
     def is_terminator(self) -> bool:
