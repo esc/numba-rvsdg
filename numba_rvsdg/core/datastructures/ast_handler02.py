@@ -130,8 +130,6 @@ class ASTHandler:
         self.current_block.instructions.append(node.test)
         # Setup jump targets for current block
         self.current_block.jump_targets = [str(then_index), str(else_index)]
-        # Add block to CFG
-        self.blocks[self.current_block.name] = self.current_block
 
         # Create a new block for the then branch
         self.blocks[str(then_index)] = \
