@@ -85,12 +85,11 @@ class ASTHandler:
         """Dispatch an AST node to handler. """
         if isinstance(node, ast.FunctionDef):
             self.handle_function_def(node)
-        elif isinstance(node, (ast.Assign, ast.AugAssign)):
-            self.handle_assign(node)
-        elif isinstance(node, ast.Expr):
-            self.handle_expr(node)
-        elif isinstance(node, ast.Return):
-            self.handle_return(node)
+        elif isinstance(node, (ast.Assign,
+                               ast.AugAssign,
+                               ast.Expr,
+                               ast.Return)):
+            self.current_block.instructions.append(node)
         elif isinstance(node, ast.If):
             self.handle_if(node)
         elif isinstance(node, ast.While):
@@ -106,15 +105,6 @@ class ASTHandler:
         if not isinstance(node.body[-1], ast.Return):
             node.body.append(ast.Return(None))
         self.codegen(node.body)
-
-    def handle_assign(self, node: ast.Assign) -> None:
-        """Handle an assignment. """
-        self.current_block.instructions.append(node)
-
-    def handle_return(self, node: ast.Return) -> None:
-        """Handle a return statement. """
-        # Update current block to include return statement
-        self.current_block.instructions.append(node)
 
     def handle_if(self, node: ast.If) -> None:
         """ Handle if statement. """
