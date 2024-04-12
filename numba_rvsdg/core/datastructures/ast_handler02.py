@@ -81,6 +81,11 @@ class ASTHandler:
         for node in tree:
             self.handle_ast_node(node)
 
+    def add_block(self, index: int):
+        """ Create block, add to CFG and set as current_block. """
+        self.blocks[str(index)] = self.current_block = \
+            WriteableBasicBlock(name=str(index))
+
     def handle_ast_node(self, node: ast.AST) -> None:
         """Dispatch an AST node to handler. """
         if isinstance(node, ast.FunctionDef):
@@ -132,30 +137,26 @@ class ASTHandler:
         self.current_block.jump_targets = [str(then_index), str(else_index)]
 
         # Create a new block for the then branch
-        self.blocks[str(then_index)] = \
-            self.current_block = \
-            WriteableBasicBlock(name=str(then_index))
+        self.add_block(then_index)
         # Recursively process then branch
         self.codegen(node.body)
-        # Set jump_targets if need be
+        # After recursion, current_block may need a jump target
         if not self.current_block.is_terminator():
             self.current_block.jump_targets = [str(enif_index)]
 
         # Create a new block for the else branch
-        self.blocks[str(else_index)] = \
-            self.current_block = \
-            WriteableBasicBlock(name=str(else_index))
+        self.add_block(else_index)
         # Recursively process else branch
         self.codegen(node.orelse)
-        # Set jump_targets if need be
+        # After recursion, current_block may need a jump target
         if not self.current_block.is_terminator():
             self.current_block.jump_targets = [str(enif_index)]
 
-        # Create a new block for the end-if
-        self.blocks[str(enif_index)] = \
-            self.current_block = \
-            WriteableBasicBlock(name=str(enif_index))
+        # Create a new block for the end-if statements, if any
+        self.add_block(enif_index)
 
+    def handle_while(self, node):
+        pass
 
     def prune_empty(self):
         for i in list(self.blocks.values()):
