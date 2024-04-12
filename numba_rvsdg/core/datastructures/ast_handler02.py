@@ -85,7 +85,7 @@ class ASTHandler:
         """Dispatch an AST node to handler. """
         if isinstance(node, ast.FunctionDef):
             self.handle_function_def(node)
-        elif isinstance(node, ast.Assign):
+        elif isinstance(node, (ast.Assign, ast.AugAssign)):
             self.handle_assign(node)
         elif isinstance(node, ast.Expr):
             self.handle_expr(node)
@@ -232,24 +232,22 @@ def branch03(x: int, a: int, b: int) -> None:
 
 def branch04(x: int, y: int, a: int, b: int) -> None:
     if x < 10:
-        z = 1
         if y < 5:
             y = a - b
         else:
             y = 2 * a
-        z = 2
     else:
-        z = 3
         if y < 15:
             y = b - a
         else:
             y = b ** 2
-        z = 4
     return y, z
 
 
 def branch05(x: int, y: int, a: int, b: int) -> None:
+    y *= 2
     if x < 10:
+        y -= 1
         if y < 5:
             y = a - b
     else:
@@ -257,6 +255,7 @@ def branch05(x: int, y: int, a: int, b: int) -> None:
             y = b - a
         else:
             return
+        y += 1
     return y
 
 
