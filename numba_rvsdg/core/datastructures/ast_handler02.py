@@ -68,11 +68,6 @@ class ASTHandler:
         assert isinstance(tree[0], ast.FunctionDef)
         # Run recrisive code generation
         self.codegen(tree)
-        # Add last block to CFG, it will be dangling when code genaration is
-        # complete
-        self.blocks[self.current_block.name] = self.current_block
-        # prune empty nodes
-        self.prune_empty()
         # Create SCFG using PythonASTBlocks and return
         return SCFG(graph=convert(self.blocks))
 
