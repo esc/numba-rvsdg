@@ -115,8 +115,6 @@ class ASTHandler:
         """Handle a return statement. """
         # Update current block to include return statement
         self.current_block.instructions.append(node)
-        # Terminate the block by clearing the jump targets
-        self.current_block.jump_targets = []
 
     def handle_if(self, node: ast.If) -> None:
         """ Handle if statement. """
