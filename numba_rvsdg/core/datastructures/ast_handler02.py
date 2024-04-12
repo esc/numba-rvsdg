@@ -139,6 +139,7 @@ class ASTHandler:
             WriteableBasicBlock(name=str(then_index))
         # Recursively process then branch
         self.codegen(node.body)
+        # Set jump_targets if need be
         if not self.current_block.is_terminator():
             self.current_block.jump_targets = [str(enif_index)]
 
@@ -148,12 +149,11 @@ class ASTHandler:
             WriteableBasicBlock(name=str(else_index))
         # Recursively process else branch
         self.codegen(node.orelse)
+        # Set jump_targets if need be
         if not self.current_block.is_terminator():
             self.current_block.jump_targets = [str(enif_index)]
 
-        # Create a new block for the end-if. If there are any elements on the
-        # if stack, we need to fixup the jump targets of the current end-if
-        # block.
+        # Create a new block for the end-if
         self.blocks[str(enif_index)] = \
             self.current_block = \
             WriteableBasicBlock(name=str(enif_index))
