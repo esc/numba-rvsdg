@@ -21,11 +21,14 @@ class WriteableBasicBlock:
         self.instructions = [] if instructions is None else instructions
         self.jump_targets = [] if jump_targets is None else jump_targets
 
-    def is_terminator(self):
+    def set_jump_targets(self, *indices: list[int]) -> None:
+        self.jump_targets = [str(a) for a in indices]
+
+    def is_terminator(self) -> bool:
         return (self.instructions and
                 isinstance(self.instructions[-1], ast.Return))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"WriteableBasicBlock({self.name}, {self.instructions}, {self.jump_targets})"
 
 
@@ -56,6 +59,7 @@ class ASTHandler:
         # (This is the datastructure to hold the CFG.)
         self.blocks = {}
         # Initialize first (genesis) block, assume it's named zero
+        # (This also initializes the self.current_block attribute.)
         self.add_block("0")
 
     def process(self) -> SCFG:
@@ -75,7 +79,7 @@ class ASTHandler:
         for node in tree:
             self.handle_ast_node(node)
 
-    def add_block(self, index: int):
+    def add_block(self, index: int) -> None:
         """ Create block, add to CFG and set as current_block. """
         self.blocks[str(index)] = self.current_block = \
             WriteableBasicBlock(name=str(index))
@@ -116,7 +120,7 @@ class ASTHandler:
         # Emit comparison value to current block
         self.current_block.instructions.append(node.test)
         # Setup jump targets for current block
-        self.current_block.jump_targets = [str(then_index), str(else_index)]
+        self.current_block.set_jump_targets(then_index, else_index)
 
         # Create a new block for the then branch
         self.add_block(then_index)
@@ -124,7 +128,7 @@ class ASTHandler:
         self.codegen(node.body)
         # After recursion, current_block may need a jump target
         if not self.current_block.is_terminator():
-            self.current_block.jump_targets = [str(enif_index)]
+            self.current_block.set_jump_targets(enif_index)
 
         # Create a new block for the else branch
         self.add_block(else_index)
@@ -132,7 +136,7 @@ class ASTHandler:
         self.codegen(node.orelse)
         # After recursion, current_block may need a jump target
         if not self.current_block.is_terminator():
-            self.current_block.jump_targets = [str(enif_index)]
+            self.current_block.set_jump_targets(enif_index)
 
         # Create a new block for the end-if statements, if any
         self.add_block(enif_index)
