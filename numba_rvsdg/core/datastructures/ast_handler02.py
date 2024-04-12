@@ -55,9 +55,8 @@ class ASTHandler:
         # Dict mapping block indices as strings to WriteableBasicBlocks
         # (This is the datastructure to hold the CFG.)
         self.blocks = {}
-        # Initialize first (genesis) block, assume it's named zero and addit to
-        # the CFG
-        self.blocks["0"] = self.current_block = WriteableBasicBlock(name="0")
+        # Initialize first (genesis) block, assume it's named zero
+        self.add_block("0")
 
     def process(self) -> SCFG:
         """Create an SCFG from a Python function. """
