@@ -223,11 +223,11 @@ def branch04(x: int, y: int, a: int, b: int) -> None:
             y = b - a
         else:
             y = b ** 2
-    return y, z
+    return y
 
 
 def branch05(x: int, y: int, a: int, b: int) -> None:
-    y *= 2
+    y << 2
     if x < 10:
         y -= 1
         if y < 5:
@@ -238,6 +238,18 @@ def branch05(x: int, y: int, a: int, b: int) -> None:
         else:
             return
         y += 1
+    return y
+
+
+def branch06(x: int, a: int, b: int) -> None:
+    if x < 10:
+        return
+    elif x < 15:
+        y = b - a
+    elif x < 20:
+        y = a ** 2
+    else:
+        y = a - b
     return y
 
 
