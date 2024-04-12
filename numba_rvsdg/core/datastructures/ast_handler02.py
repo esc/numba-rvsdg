@@ -142,7 +142,33 @@ class ASTHandler:
         self.add_block(enif_index)
 
     def handle_while(self, node):
-        pass
+        # Preallocate header, body and exiting indices
+        head_index = self.block_index
+        body_index = self.block_index + 1
+        exit_index = self.block_index + 2
+        self.block_index += 3
+
+        # Point whatever the current block to header block
+        self.current_block.set_jump_targets(head_index)
+
+        # Create header block
+        self.add_block(head_index)
+        # Emit comparison expression into it
+        self.current_block.instructions.append(node.test)
+        # Set the jump targets to be the body and the exiting latch
+        self.current_block.set_jump_targets(body_index, exit_index)
+
+        # Create body block
+        self.add_block(body_index)
+        # Recurse into it
+        self.codegen(node.body)
+        # After recursion, get the body to point to the exit, unless it
+        # terminates
+        if not self.current_block.is_terminator():
+            self.current_block.set_jump_targets(head_index)
+
+        # Create exit block
+        self.add_block(exit_index)
 
     def prune_empty(self):
         for i in list(self.blocks.values()):
@@ -255,6 +281,23 @@ def branch06(x: int, a: int, b: int) -> None:
         y = a - b
     return y
 
+def branch07(x: int, a: int, b: int) -> None:
+    if y < 5:
+        return y
+    else:
+        return y
+    return y
+
+
+def loop01():
+    x = 0
+    while x < 10:
+        if x < 3:
+            x += 2
+        else:
+            while x < 5:
+                x += 1
+    return x
 
 #def branch02(a: int, b:int) -> None:
 #    if x < 10:
@@ -294,6 +337,7 @@ def branch06(x: int, a: int, b: int) -> None:
 #    return 0
 
 
-h = ASTHandler(branch05)
+h = ASTHandler(loop01)
 s = h.process()
 render_scfg(s)
+
