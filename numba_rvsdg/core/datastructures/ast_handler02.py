@@ -21,6 +21,10 @@ class WriteableBasicBlock:
         self.instructions = [] if instructions is None else instructions
         self.jump_targets = [] if jump_targets is None else jump_targets
 
+    def is_terminator(self):
+        return (self.instructions and
+                isinstance(self.instructions[-1], ast.Return))
+
     def __repr__(self):
         return f"WriteableBasicBlock({self.name}, {self.instructions}, {self.jump_targets})"
 
@@ -51,8 +55,6 @@ class ASTHandler:
         # Dict mapping block indices as strings to WriteableBasicBlocks
         # (This is the datastructure to hold the CFG.)
         self.blocks = {}
-        # If-stack to remember if-nesting
-        self.if_stack = []
         # Initialize first (genesis) block, assume it's named zero and addit to
         # the CFG
         self.blocks["0"] = self.current_block = WriteableBasicBlock(name="0")
@@ -131,41 +133,31 @@ class ASTHandler:
         # Add block to CFG
         self.blocks[self.current_block.name] = self.current_block
 
-        # Add end-if index to if stack. This must be done before any recursive
-        # calls, such that the end-if blocks in nested if statements know where
-        # to point to.
-        self.if_stack.append(enif_index)
-
         # Create a new block for the then branch
         self.blocks[str(then_index)] = \
             self.current_block = \
-            WriteableBasicBlock(
-                name=str(then_index),
-                jump_targets=[str(enif_index)])
+            WriteableBasicBlock(name=str(then_index))
         # Recursively process then branch
         self.codegen(node.body)
+        if not self.current_block.is_terminator():
+            self.current_block.jump_targets = [str(enif_index)]
 
         # Create a new block for the else branch
         self.blocks[str(else_index)] = \
             self.current_block = \
-            WriteableBasicBlock(
-                name=str(else_index),
-                jump_targets=[str(enif_index)])
+            WriteableBasicBlock(name=str(else_index))
         # Recursively process else branch
         self.codegen(node.orelse)
-
-        # All recursive calls have been made, so we can now pop the if-stack
-        self.if_stack.pop()
+        if not self.current_block.is_terminator():
+            self.current_block.jump_targets = [str(enif_index)]
 
         # Create a new block for the end-if. If there are any elements on the
         # if stack, we need to fixup the jump targets of the current end-if
         # block.
         self.blocks[str(enif_index)] = \
             self.current_block = \
-            WriteableBasicBlock(
-                name=str(enif_index),
-                jump_targets=[str(self.if_stack[-1])] if self.if_stack else ()
-            )
+            WriteableBasicBlock(name=str(enif_index))
+
 
     def prune_empty(self):
         for i in list(self.blocks.values()):
