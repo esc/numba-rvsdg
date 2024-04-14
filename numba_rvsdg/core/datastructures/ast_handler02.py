@@ -24,9 +24,27 @@ class WriteableBasicBlock:
     def set_jump_targets(self, *indices: int) -> None:
         self.jump_targets = [str(a) for a in indices]
 
-    def is_terminator(self) -> bool:
+    def is_return(self) -> bool:
         return (self.instructions and
                 isinstance(self.instructions[-1], ast.Return))
+
+    def is_break(self) -> bool:
+        return (self.instructions and
+                isinstance(self.instructions[-1], ast.Break))
+
+    def is_continue(self) -> bool:
+        return (self.instructions and
+                isinstance(self.instructions[-1], ast.Continue))
+
+    def seal(self, head_index, exit_index, enif_index):
+        if self.is_continue():
+            self.set_jump_targets(head_index)
+        elif self.is_break():
+            self.set_jump_targets(exit_index)
+        elif self.is_return():
+            pass
+        else:
+            self.set_jump_targets(enif_index)
 
     def __repr__(self) -> str:
         return f"WriteableBasicBlock({self.name}, {self.instructions}, {self.jump_targets})"
@@ -62,6 +80,9 @@ class ASTHandler:
         # (This also initializes the self.current_block attribute.)
         self.add_block("0")
 
+        self.loop_head_stack = []
+        self.loop_exit_stack = []
+
     def process(self) -> SCFG:
         """Create an SCFG from a Python function. """
         # Convert source code into AST
@@ -91,7 +112,10 @@ class ASTHandler:
         elif isinstance(node, (ast.Assign,
                                ast.AugAssign,
                                ast.Expr,
-                               ast.Return)):
+                               ast.Return,
+                               ast.Break,
+                               ast.Continue,
+                              )):
             self.current_block.instructions.append(node)
         elif isinstance(node, ast.If):
             self.handle_if(node)
@@ -127,16 +151,18 @@ class ASTHandler:
         # Recursively process then branch
         self.codegen(node.body)
         # After recursion, current_block may need a jump target
-        if not self.current_block.is_terminator():
-            self.current_block.set_jump_targets(enif_index)
+        self.current_block.seal(self.loop_head_stack[-1],
+                                self.loop_exit_stack[-1],
+                                enif_index)
 
         # Create a new block for the else branch
         self.add_block(else_index)
         # Recursively process else branch
         self.codegen(node.orelse)
         # After recursion, current_block may need a jump target
-        if not self.current_block.is_terminator():
-            self.current_block.set_jump_targets(enif_index)
+        self.current_block.seal(self.loop_head_stack[-1],
+                                self.loop_exit_stack[-1],
+                                enif_index)
 
         # Create a new block for the end-if statements, if any
         self.add_block(enif_index)
@@ -158,14 +184,21 @@ class ASTHandler:
         # Set the jump targets to be the body and the exiting latch
         self.current_block.set_jump_targets(body_index, exit_index)
 
+        self.loop_head_stack.append(head_index)
+        self.loop_exit_stack.append(exit_index)
+
         # Create body block
         self.add_block(body_index)
         # Recurse into it
         self.codegen(node.body)
         # After recursion, get the body to point to the exit, unless it
         # terminates
-        if not self.current_block.is_terminator():
-            self.current_block.set_jump_targets(head_index)
+        self.current_block.seal(head_index,
+                                exit_index,
+                                head_index)
+
+        self.loop_head_stack.pop()
+        self.loop_exit_stack.pop()
 
         # Create exit block
         self.add_block(exit_index)
@@ -289,6 +322,13 @@ def branch07(x: int, a: int, b: int) -> None:
     return y
 
 
+def loop0():
+    x = 0
+    while x < 10:
+        x += 1
+    return x
+
+
 def loop01():
     x = 0
     while x < 10:
@@ -298,6 +338,25 @@ def loop01():
             while x < 5:
                 x += 1
     return x
+
+
+def loop_break():
+    x = 0
+    while x < 10:
+        if x < 3:
+            break
+        else:
+            x += 1
+    return x
+
+def loop_continue():
+    x = 0
+    while x < 10:
+        if x > 5:
+            continue
+        x += 1
+    return x
+
 
 #def branch02(a: int, b:int) -> None:
 #    if x < 10:
@@ -337,7 +396,7 @@ def loop01():
 #    return 0
 
 
-h = ASTHandler(loop01)
+h = ASTHandler(loop_break)
 s = h.process()
 render_scfg(s)
 
