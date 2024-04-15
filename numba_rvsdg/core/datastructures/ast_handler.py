@@ -120,9 +120,9 @@ class ASTHandler:
         self.handle(code)
         return self.blocks
 
-    def genarete_SCFG(self, code: Callable) -> SCFG:
+    def generate_SCFG(self, code: Callable) -> SCFG:
         self.handle(code)
-        return self.blocks.to_scfg()
+        return self.blocks.to_SCFG()
 
     def codegen(self, tree: list[ast.AST]) -> None:
         """Recursively Generate code from a list of AST nodes. """
@@ -162,6 +162,12 @@ class ASTHandler:
             node.body.append(ast.Return(None))
         self.codegen(node.body)
 
+    def seal(self, default_index):
+        self.current_block.seal(
+            self.loop_head_stack[-1] if self.loop_head_stack else -1,
+            self.loop_exit_stack[-1] if self.loop_exit_stack else -1,
+            default_index)
+
     def handle_if(self, node: ast.If) -> None:
         """ Handle if statement. """
         # Preallocate block indices for then, else, and end-if
@@ -180,18 +186,14 @@ class ASTHandler:
         # Recursively process then branch
         self.codegen(node.body)
         # After recursion, current_block may need a jump target
-        self.current_block.seal(self.loop_head_stack[-1],
-                                self.loop_exit_stack[-1],
-                                enif_index)
+        self.seal(enif_index)
 
         # Create a new block for the else branch
         self.add_block(else_index)
         # Recursively process else branch
         self.codegen(node.orelse)
         # After recursion, current_block may need a jump target
-        self.current_block.seal(self.loop_head_stack[-1],
-                                self.loop_exit_stack[-1],
-                                enif_index)
+        self.seal(enif_index)
 
         # Create a new block for the end-if statements, if any
         self.add_block(enif_index)
@@ -213,21 +215,23 @@ class ASTHandler:
         # Set the jump targets to be the body and the exiting latch
         self.current_block.set_jump_targets(body_index, exit_index)
 
-        self.loop_head_stack.append(head_index)
-        self.loop_exit_stack.append(exit_index)
 
         # Create body block
         self.add_block(body_index)
+
+        # setup loop stacks for recursion
+        self.loop_head_stack.append(head_index)
+        self.loop_exit_stack.append(exit_index)
+
         # Recurse into it
         self.codegen(node.body)
-        # After recursion, get the body to point to the exit, unless it
-        # terminates
-        self.current_block.seal(head_index,
-                                exit_index,
-                                head_index)
 
+        # pop values from loop stack post recursion
         self.loop_head_stack.pop()
         self.loop_exit_stack.pop()
+
+        # After recursion, seal current block
+        self.seal(head_index)
 
         # Create exit block
         self.add_block(exit_index)
@@ -413,5 +417,5 @@ def loop_continue():
 
 if __name__ == "__main__":
     h = ASTHandler()
-    s = h.to_SCFG(loop_continue)
+    s = h.generate_SCFG(loop_continue)
     render_scfg(s)
