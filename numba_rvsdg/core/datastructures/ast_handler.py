@@ -285,63 +285,19 @@ class ASTHandler:
         render_scfg(self.blocks.to_SCFG())
 
 
-def loop_break():
-    x = 0
-    while x < 10:
-        if x < 3:
-            break
-        else:
-            x += 1
-    return x
-
-
-def loop_continue():
-    x = 0
-    while x < 10:
-        if x > 5:
-            continue
-        x += 1
-    return x
-
-
-#def branch02(a: int, b:int) -> None:
-#    if x < 10:
-#        return 1
-#    else:
-#        return 2
-#
-#def branch03(a: int, b:int) -> None:
-#    x = a + b
-#    if x < 10:
-#        return 1
-#    else:
-#        if x < 5:
-#            return 2
-#        else:
-#            return 3
-#
-#def branch04(a: int, b:int) -> None:
-#    x = a + b
-#    if x < 10:
-#        if x < 2:
-#            return 1
-#        else:
-#            return 2
-#    else:
-#        if x < 5:
-#            return 3
-#        else:
-#            return 4
-#
-#def branch05(a: int, b:int) -> None:
-#    if x < 10:
-#        return 1
-#    y = b + 2
-#    if y < 5:
-#        return 2
-#    return 0
-
 if __name__ == "__main__":
+    def function(a: int, b: int) -> int:
+        x = a + b
+        if x < 10:
+            if x < 2:
+                return 1
+            else:
+                return 2
+        else:
+            if x < 5:
+                return 3
+            else:
+                return 4
     h = ASTHandler()
-    s = h.generate_SCFG(loop_continue)
+    s = h.generate_SCFG(function)
     render_scfg(s)

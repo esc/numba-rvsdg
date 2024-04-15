@@ -585,6 +585,83 @@ class TestASTConversion(TestCase):
             """)
         self.compare(function, expected)
 
+    def test_loop_break_continue(self):
+        def function():
+            x = 0
+            while x < 10:
+                x += 1
+                if x % 2 == 0:
+                    continue
+                elif x == 9:
+                    break
+                else:
+                    x += 1
+            return x
+
+        expected = textwrap.dedent("""
+            '0':
+              instructions:
+              - x = 0
+              jump_targets:
+              - '1'
+              name: '0'
+            '1':
+              instructions:
+              - x < 10
+              jump_targets:
+              - '2'
+              - '3'
+              name: '1'
+            '2':
+              instructions:
+              - x += 1
+              - x % 2 == 0
+              jump_targets:
+              - '4'
+              - '5'
+              name: '2'
+            '3':
+              instructions:
+              - return x
+              jump_targets: []
+              name: '3'
+            '4':
+              instructions:
+              - continue
+              jump_targets:
+              - '1'
+              name: '4'
+            '5':
+              instructions:
+              - x == 9
+              jump_targets:
+              - '7'
+              - '8'
+              name: '5'
+            '6':
+              instructions: []
+              jump_targets:
+              - '1'
+              name: '6'
+            '7':
+              instructions:
+              - break
+              jump_targets:
+              - '3'
+              name: '7'
+            '8':
+              instructions:
+              - x += 1
+              jump_targets:
+              - '9'
+              name: '8'
+            '9':
+              instructions: []
+              jump_targets:
+              - '6'
+              name: '9'
+            """)
+        self.compare(function, expected)
 
 if __name__ == "__main__":
     main()
