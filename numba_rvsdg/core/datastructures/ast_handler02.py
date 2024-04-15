@@ -36,7 +36,7 @@ class WriteableBasicBlock:
         return (self.instructions and
                 isinstance(self.instructions[-1], ast.Continue))
 
-    def seal(self, head_index, exit_index, enif_index):
+    def seal(self, head_index, exit_index, dflt_index):
         if self.is_continue():
             self.set_jump_targets(head_index)
         elif self.is_break():
@@ -44,7 +44,7 @@ class WriteableBasicBlock:
         elif self.is_return():
             pass
         else:
-            self.set_jump_targets(enif_index)
+            self.set_jump_targets(dflt_index)
 
     def __repr__(self) -> str:
         return f"WriteableBasicBlock({self.name}, {self.instructions}, {self.jump_targets})"
