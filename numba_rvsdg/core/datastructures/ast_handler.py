@@ -209,6 +209,7 @@ class ASTHandler:
         self.add_block(enif_index)
 
     def handle_while(self, node):
+        """ Handle while statement. """
         # Preallocate header, body and exiting indices
         head_index = self.block_index
         body_index = self.block_index + 1
