@@ -264,8 +264,7 @@ class ASTHandler:
         intermediary results.
 
         """
-        s = SCFG(graph=convert(self.blocks))
-        render_scfg(s)
+        render_scfg(self.to_SCFG())
 
 
 def acc():
