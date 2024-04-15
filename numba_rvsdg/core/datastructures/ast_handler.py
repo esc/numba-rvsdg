@@ -263,19 +263,6 @@ class ASTHandler:
         render_scfg(s)
 
 
-def solo_return():
-    return 1
-
-
-def solo_assign():
-    x = 1
-
-
-def assign_return():
-    x = 1
-    return x
-
-
 def acc():
     r = 0
     for i in range(10):
