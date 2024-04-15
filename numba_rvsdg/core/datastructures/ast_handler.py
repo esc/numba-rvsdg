@@ -3,6 +3,7 @@ import inspect
 from typing import Callable
 import textwrap
 
+
 from numba_rvsdg.core.datastructures.scfg import SCFG
 from numba_rvsdg.core.datastructures.basic_block import PythonASTBlock
 from numba_rvsdg.rendering.rendering import render_scfg
@@ -69,7 +70,13 @@ class ASTCFG(dict):
                     "jump_targets": v.jump_targets,
                     } for (k, v) in self.items()}
 
+    def to_yaml(self) -> str:
+        """ Convert ASTCFG to yaml based string serialization. """
+        import yaml
+        return yaml.dump(self.to_dict())
+
     def to_SCFG(self):
+        """ Convert ASTCFG to SCFG"""
         return SCFG(graph=self.convert_blocks())
 
 
