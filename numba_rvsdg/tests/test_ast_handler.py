@@ -24,7 +24,7 @@ class TestASTConversion(TestCase):
 
     def test_solo_assign(self):
         def f():
-            x = 1
+            x = 1  # noqa: F841
         astcfg = handler.generate_ASTCFG(f)
         expected = textwrap.dedent("""
             '0':
@@ -50,7 +50,7 @@ class TestASTConversion(TestCase):
         self.assertEqual(astcfg.to_dict(), yaml.safe_load(expected))
 
     def test_if_return(self):
-        def f():
+        def f(x: int):
             if x < 10:
                 return 1
             return 2
@@ -82,7 +82,7 @@ class TestASTConversion(TestCase):
         self.assertEqual(astcfg.to_dict(), yaml.safe_load(expected))
 
     def test_if_else_return(self):
-        def f():
+        def f(x: int):
             if x < 10:
                 return 1
             else:
