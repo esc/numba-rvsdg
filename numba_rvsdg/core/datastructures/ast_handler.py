@@ -1,11 +1,63 @@
 import ast
 import inspect
 from typing import Callable
-from collections import deque
 
 
 from numba_rvsdg.core.datastructures.scfg import SCFG
 from numba_rvsdg.core.datastructures.basic_block import PythonASTBlock
+from numba_rvsdg.rendering.rendering import render_scfg
+
+
+class WriteableBasicBlock:
+    """ A basic block that can be written to.
+
+    The ast -> cfg algorithm requires a basic block that can be written to.
+
+    """
+    def __init__(self, name: str,
+                 instructions: list[ast.AST] = None,
+                 jump_targets: list[str, str] = None) -> None:
+        self.name = name
+        self.instructions = [] if instructions is None else instructions
+        self.jump_targets = [] if jump_targets is None else jump_targets
+
+    def set_jump_targets(self, *indices: int) -> None:
+        self.jump_targets = [str(a) for a in indices]
+
+    def is_return(self) -> bool:
+        return (self.instructions and
+                isinstance(self.instructions[-1], ast.Return))
+
+    def is_break(self) -> bool:
+        return (self.instructions and
+                isinstance(self.instructions[-1], ast.Break))
+
+    def is_continue(self) -> bool:
+        return (self.instructions and
+                isinstance(self.instructions[-1], ast.Continue))
+
+    def seal(self, head_index, exit_index, dflt_index):
+        if self.is_continue():
+            self.set_jump_targets(head_index)
+        elif self.is_break():
+            self.set_jump_targets(exit_index)
+        elif self.is_return():
+            pass
+        else:
+            self.set_jump_targets(dflt_index)
+
+    def __repr__(self) -> str:
+        return f"WriteableBasicBlock({self.name}, {self.instructions}, {self.jump_targets})"
+
+
+def convert(blocks: dict[str, WriteableBasicBlock]
+            ) -> dict[str, PythonASTBlock]:
+    """ Convert CFG of WriteableBasicBlocks to CFG of PythonASTBlocks.  """
+    return {v.name: PythonASTBlock(
+        v.name,
+        tree=v.instructions,
+        _jump_targets=tuple(v.jump_targets))
+        for v in blocks.values()}
 
 
 class ASTHandler:
@@ -17,190 +69,183 @@ class ASTHandler:
     """
 
     def __init__(self, code: Callable) -> None:
+        # Source code to convert
         self.code = code
-        self.block_index = 0
-        self.look_ahead_index = 0
+        # Monotonically increasing block index
+        self.block_index = 1
+        # Dict mapping block indices as strings to WriteableBasicBlocks
+        # (This is the datastructure to hold the CFG.)
         self.blocks = {}
-        self.current_block = []
-        self.if_stack = []
+        # Initialize first (genesis) block, assume it's named zero
+        # (This also initializes the self.current_block attribute.)
+        self.add_block("0")
+
+        self.loop_head_stack = []
+        self.loop_exit_stack = []
 
     def process(self) -> SCFG:
         """Create an SCFG from a Python function. """
-        # convert source code into AST
-        tree = ast.parse(inspect.getsource(self.code))
-        # initialize queue
-        self.queue = deque(tree.body)
-        # check that this is a function def
-        assert isinstance(self.queue[0], ast.FunctionDef)
-        # expand the function def
-        self.handle_function_def(self.queue.popleft())
-        # insert final return None if no return at end of function
-        if not isinstance(self.queue[-1], ast.Return):
-            self.queue.append(ast.Return(None))
-        # iterate over program
-        while self.queue:
-            print(self.queue, self.blocks, self.current_block, self.block_index)
-            breakpoint()
-            self.handle_ast_node(self.queue.popleft())
-        #else:
-        #    if self.current_block:
-        #        self.new_block(index=self.block_index)
+        # Convert source code into AST
+        tree = ast.parse(inspect.getsource(self.code)).body
+        # Assert that the code handed in was a function, we can only convert
+        # functions.
+        assert isinstance(tree[0], ast.FunctionDef)
+        # Run recrisive code generation
+        self.codegen(tree)
+        # Create SCFG using PythonASTBlocks and return
+        return SCFG(graph=convert(self.blocks))
 
-        return SCFG(graph=self.blocks)
+    def codegen(self, tree: list[ast.AST]) -> None:
+        """Recursively Generate code from a list of AST nodes. """
+        for node in tree:
+            self.handle_ast_node(node)
+
+    def add_block(self, index: int) -> None:
+        """ Create block, add to CFG and set as current_block. """
+        self.blocks[str(index)] = self.current_block = \
+            WriteableBasicBlock(name=str(index))
 
     def handle_ast_node(self, node: ast.AST) -> None:
-        """Handle an AST node. """
+        """Dispatch an AST node to handler. """
         if isinstance(node, ast.FunctionDef):
             self.handle_function_def(node)
-        elif isinstance(node, ast.Assign):
-            self.handle_assign(node)
-        elif isinstance(node, ast.Expr):
-            self.handle_expr(node)
-        elif isinstance(node, ast.Return):
-            self.handle_return(node)
+        elif isinstance(node, (ast.Assign,
+                               ast.AugAssign,
+                               ast.Expr,
+                               ast.Return,
+                               ast.Break,
+                               ast.Continue,
+                              )):
+            self.current_block.instructions.append(node)
         elif isinstance(node, ast.If):
-            self.handle_if02(node)
+            self.handle_if(node)
         elif isinstance(node, ast.While):
             self.handle_while(node)
         elif isinstance(node, ast.For):
             self.handle_for(node)
-        elif isinstance(node, str):
-            if node == "ENDFOR":
-                self.new_block()
-            elif node.startswith("ENDTHEN") or node.startswith("ENDELSE"):
-                index = int(node[7:])
-                if self.current_block and isinstance(self.current_block[-1], ast.Return):
-                    self.new_terminating_block(index)
-                else:
-                    self.new_fallthrough_block(index, self.if_stack[-1])
-            elif node.startswith("ENDIF"):
-                index = int(node[5:])
-                target = self.if_stack.pop()
-                assert index == target
-                self.new_fallthrough_block(index, self.if_stack[-1] if
-                                           self.if_stack else self.block_index)
         else:
             raise NotImplementedError(f"Node type {node} not implemented")
 
-    def new_terminating_block(self, index:int):
-        self.blocks[str(index)] = PythonASTBlock(
-            name=str(index),
-            tree=self.current_block)
-        self.current_block = []
-
-    def new_fallthrough_block(self, index:int, target:int):
-        self.blocks[str(index)] = PythonASTBlock(
-            name=str(index),
-            _jump_targets=((str(target),)),
-            tree=self.current_block)
-        self.current_block = []
-
-    def new_block(self, index: int) -> None:
-        """Create a new block. """
-        if isinstance(self.current_block[-1], ast.Return):
-            self.blocks[str(index)] = PythonASTBlock(
-                name=str(index),
-                tree=self.current_block)
-        else:
-            self.blocks[str(index)] = PythonASTBlock(
-                name=str(index),
-                _jump_targets=(str(self.if_stack[-1])),
-                tree=self.current_block)
-        self.current_block = []
-
-    def new_branch_block(self, index: int) -> tuple[int, int]:
-        """Create a new block. """
-        self.blocks[str(index)] = PythonASTBlock(
-            name=str(index),
-            _jump_targets=(str(self.block_index),
-                           str(self.block_index + 1)),
-            tree=self.current_block)
-        self.current_block = []
-        return_value = (self.block_index, self.block_index + 1)
-        self.block_index += 2
-        return return_value
-
-    def new_branch_block_empty_else(self, index:int) -> tuple[int, int]:
-        """Create a new block. """
-        self.blocks[str(index)] = PythonASTBlock(
-            name=str(index),
-            _jump_targets=(str(self.block_index),
-                           str(self.block_index + 1)),
-            tree=self.current_block)
-        self.current_block = []
-        return_value = (self.block_index, self.block_index + 1)
-        self.block_index += 1
-        return return_value
-
     def handle_function_def(self, node: ast.FunctionDef) -> None:
         """Handle a function definition. """
-        self.queue.extend(node.body)
-
-    def handle_assign(self, node: ast.Assign) -> None:
-        """Handle an assignment. """
-        self.current_block.append(node)
-
-    def handle_expr(self, node: ast.Expr) -> None:
-        """Handle an expression. """
-        self.current_block.append(node)
-
-    def handle_return(self, node: ast.Return) -> None:
-        """Handle a return statement. """
-        self.current_block.append(node)
-        if len(self.queue) >= 1:
-            pass
-        else:
-            index = self.block_index
-            self.new_block(self.block_index)
-
-    def handle_for(self, node: ast.For) -> None:
-        """Handle a for loop. """
-        self.new_block()
-        self.current_block.append(node)
-        self.queue.extend(node.body)
-        self.queue.append("ENDFOR")
+        # Insert implicit return None, if the function isn't terminated
+        if not isinstance(node.body[-1], ast.Return):
+            node.body.append(ast.Return(None))
+        self.codegen(node.body)
 
     def handle_if(self, node: ast.If) -> None:
-        """Handle an if statement. """
-        self.current_block.append(node.test)
-        if (len(self.queue) >= 1
-                and isinstance(self.queue[0], str)
-                and self.queue[0].startswith("ENDIF")):
-            index = int(self.queue.popleft()[5:])
-        else:
-            index = self.block_index
-            self.block_index += 1
-        if not node.orelse:
-            t,f = self.new_branch_block_empty_else(index)
-        else:
-            t,f = self.new_branch_block(index)
-        self.queue.extend(node.body)
-        self.queue.append(f"ENDIF{t}")
-        if node.orelse:
-            self.queue.extend(node.orelse)
-            self.queue.append(f"ENDIF{f}")
+        """ Handle if statement. """
+        # Preallocate block indices for then, else, and end-if
+        then_index = self.block_index
+        else_index = self.block_index + 1
+        enif_index = self.block_index + 2
+        self.block_index += 3
 
-    def handle_if02(self, node: ast.If) -> None:
-        this_index = self.block_index
-        then_index = self.block_index + 1
-        else_index = self.block_index + 2
-        enif_index = self.block_index + 3
-        self.block_index += 4
-        self.if_stack.extend([enif_index])
-        self.queue.appendleft(f"ENDIF{enif_index}")
-        self.queue.appendleft(f"ENDELSE{else_index}")
-        self.queue.extendleft(node.orelse[::-1])
-        self.queue.appendleft(f"ENDTHEN{then_index}")
-        self.queue.extendleft(node.body[::-1])
+        # Emit comparison value to current block
+        self.current_block.instructions.append(node.test)
+        # Setup jump targets for current block
+        self.current_block.set_jump_targets(then_index, else_index)
 
-        self.current_block.append(node.test)
-        name = str(this_index)
-        self.blocks[name] = PythonASTBlock(
-            name=name,
-            _jump_targets=(str(then_index),
-                           str(else_index)),
-            tree=self.current_block)
-        self.current_block = []
+        # Create a new block for the then branch
+        self.add_block(then_index)
+        # Recursively process then branch
+        self.codegen(node.body)
+        # After recursion, current_block may need a jump target
+        self.current_block.seal(self.loop_head_stack[-1],
+                                self.loop_exit_stack[-1],
+                                enif_index)
+
+        # Create a new block for the else branch
+        self.add_block(else_index)
+        # Recursively process else branch
+        self.codegen(node.orelse)
+        # After recursion, current_block may need a jump target
+        self.current_block.seal(self.loop_head_stack[-1],
+                                self.loop_exit_stack[-1],
+                                enif_index)
+
+        # Create a new block for the end-if statements, if any
+        self.add_block(enif_index)
+
+    def handle_while(self, node):
+        # Preallocate header, body and exiting indices
+        head_index = self.block_index
+        body_index = self.block_index + 1
+        exit_index = self.block_index + 2
+        self.block_index += 3
+
+        # Point whatever the current block to header block
+        self.current_block.set_jump_targets(head_index)
+
+        # Create header block
+        self.add_block(head_index)
+        # Emit comparison expression into it
+        self.current_block.instructions.append(node.test)
+        # Set the jump targets to be the body and the exiting latch
+        self.current_block.set_jump_targets(body_index, exit_index)
+
+        self.loop_head_stack.append(head_index)
+        self.loop_exit_stack.append(exit_index)
+
+        # Create body block
+        self.add_block(body_index)
+        # Recurse into it
+        self.codegen(node.body)
+        # After recursion, get the body to point to the exit, unless it
+        # terminates
+        self.current_block.seal(head_index,
+                                exit_index,
+                                head_index)
+
+        self.loop_head_stack.pop()
+        self.loop_exit_stack.pop()
+
+        # Create exit block
+        self.add_block(exit_index)
+
+    def prune_empty(self):
+        for i in list(self.blocks.values()):
+            if not i.instructions:
+                self.blocks.pop(i.name)
+                # Empty nodes can only have a single jump target.
+                it = i.jump_targets[0]
+                # iterate over the nodes looking for nodes that point to the
+                # removed node
+                for j in list(self.blocks.values()):
+                    if len(j.jump_targets) == 0:
+                        continue
+                    elif len(j.jump_targets) == 1:
+                        if j.jump_targets[0] == i.name:
+                            j.jump_targets[0] = it
+                    elif len(j.jump_targets) == 2:
+                        if j.jump_targets[0] == i.name:
+                            j.jump_targets[0] = it
+                        elif j.jump_targets[1] == i.name:
+                            j.jump_targets[1] = it
+
+    def render(self):
+        """ Render the CFG contained in this handler as a SCFG.
+
+        Useful for debugging purposes, set a breakpoint and then render to view
+        intermediary results.
+
+        """
+        s = SCFG(graph=convert(self.blocks))
+        render_scfg(s)
+
+
+def solo_return():
+    return 1
+
+
+def solo_assign():
+    x = 1
+
+
+def assign_return():
+    x = 1
+    return x
+
 
 def acc():
     r = 0
@@ -208,35 +253,110 @@ def acc():
         r = r + 1
     return r
 
-def branch01(a: int, b:int) -> None:
+
+def branch01(x: int) -> None:
     if x < 10:
         return 1
     return 2
 
-def branch02(a: int, b:int) -> None:
+
+def branch02(x: int, y: int, a: int, b: int) -> None:
     if x < 10:
         y = a + b
     z = a - b
 
-def branch03(a: int, b:int) -> None:
+
+def branch03(x: int, a: int, b: int) -> None:
     if x < 10:
-        y = a -b
+        return
     else:
-        y = b -c
+        y = b - a
     return y
 
-def branch04(x:int, y:int, a: int, b:int) -> None:
+
+def branch04(x: int, y: int, a: int, b: int) -> None:
     if x < 10:
         if y < 5:
             y = a - b
         else:
             y = 2 * a
     else:
-        if y < 5:
+        if y < 15:
             y = b - a
         else:
-            y = 2 * b
+            y = b ** 2
     return y
+
+
+def branch05(x: int, y: int, a: int, b: int) -> None:
+    y << 2
+    if x < 10:
+        y -= 1
+        if y < 5:
+            y = a - b
+    else:
+        if y < 15:
+            y = b - a
+        else:
+            return
+        y += 1
+    return y
+
+
+def branch06(x: int, a: int, b: int) -> None:
+    if x < 10:
+        return
+    elif x < 15:
+        y = b - a
+    elif x < 20:
+        y = a ** 2
+    else:
+        y = a - b
+    return y
+
+def branch07(x: int, a: int, b: int) -> None:
+    if y < 5:
+        return y
+    else:
+        return y
+    return y
+
+
+def loop0():
+    x = 0
+    while x < 10:
+        x += 1
+    return x
+
+
+def loop01():
+    x = 0
+    while x < 10:
+        if x < 3:
+            x += 2
+        else:
+            while x < 5:
+                x += 1
+    return x
+
+
+def loop_break():
+    x = 0
+    while x < 10:
+        if x < 3:
+            break
+        else:
+            x += 1
+    return x
+
+def loop_continue():
+    x = 0
+    while x < 10:
+        if x > 5:
+            continue
+        x += 1
+    return x
+
 
 #def branch02(a: int, b:int) -> None:
 #    if x < 10:
@@ -276,9 +396,7 @@ def branch04(x:int, y:int, a: int, b:int) -> None:
 #    return 0
 
 
-h = ASTHandler(branch04)
+h = ASTHandler(loop_break)
 s = h.process()
-#breakpoint()
-from numba_rvsdg.rendering.rendering import render_scfg
 render_scfg(s)
 
