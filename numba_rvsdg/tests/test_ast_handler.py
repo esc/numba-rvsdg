@@ -149,7 +149,7 @@ class TestASTConversion(TestCase):
         self.compare(function, expected)
 
     def test_nested_if(self):
-        def function(x: int, y: int):
+        def function(x: int, y: int) -> int:
             if x < 10:
                 if y < 5:
                     y = 1
@@ -226,7 +226,7 @@ class TestASTConversion(TestCase):
         self.compare(function, expected)
 
     def test_nested_if_with_empty_else_and_return(self):
-        def function(x: int, y: int, a: int, b: int) -> None:
+        def function(x: int, y: int) -> None:
             y << 2
             if x < 10:
                 y -= 1
@@ -306,7 +306,7 @@ class TestASTConversion(TestCase):
 
     def test_elif(self):
 
-        def function(x: int, a: int, b: int) -> None:
+        def function(x: int, a: int, b: int) -> int:
             if x < 10:
                 return
             elif x < 15:
@@ -380,7 +380,7 @@ class TestASTConversion(TestCase):
         self.compare(function, expected)
 
     def test_simple_loop(self):
-        def function() -> None:
+        def function() -> int:
             x = 0
             while x < 10:
                 x += 1
@@ -466,7 +466,7 @@ class TestASTConversion(TestCase):
         self.compare(function, expected)
 
     def test_if_in_loop(self):
-        def function() -> tuple[int, int]:
+        def function() -> int:
             x = 0
             while x < 10:
                 if x < 5:
@@ -522,7 +522,7 @@ class TestASTConversion(TestCase):
         self.compare(function, expected)
 
     def test_loop_in_if(self):
-        def function(a: bool) -> tuple[int, int]:
+        def function(a: bool) -> int:
             x = 0
             if a is True:
                 while x < 10:
@@ -586,7 +586,7 @@ class TestASTConversion(TestCase):
         self.compare(function, expected)
 
     def test_loop_break_continue(self):
-        def function():
+        def function() -> int:
             x = 0
             while x < 10:
                 x += 1
@@ -662,6 +662,7 @@ class TestASTConversion(TestCase):
               name: '9'
             """)
         self.compare(function, expected)
+
 
 if __name__ == "__main__":
     main()
