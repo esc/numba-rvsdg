@@ -10,22 +10,24 @@ handler = ASTHandler()
 
 class TestASTConversion(TestCase):
 
+    def compare(self, function, expected):
+        astcfg = handler.generate_ASTCFG(function)
+        self.assertEqual(astcfg.to_dict(), yaml.safe_load(expected))
+
     def test_solo_return(self):
-        def f():
+        def function():
             return 1
-        astcfg = handler.generate_ASTCFG(f)
         expected = textwrap.dedent("""
             '0':
               instructions:
               - return 1
               jump_targets: []
               name: '0'""")
-        self.assertEqual(astcfg.to_dict(), yaml.safe_load(expected))
+        self.compare(function, expected)
 
     def test_solo_assign(self):
-        def f():
+        def function():
             x = 1  # noqa: F841
-        astcfg = handler.generate_ASTCFG(f)
         expected = textwrap.dedent("""
             '0':
               instructions:
@@ -33,13 +35,12 @@ class TestASTConversion(TestCase):
               - return
               jump_targets: []
               name: '0'""")
-        self.assertEqual(astcfg.to_dict(), yaml.safe_load(expected))
+        self.compare(function, expected)
 
     def test_assign_return(self):
-        def f():
+        def function():
             x = 1
             return x
-        astcfg = handler.generate_ASTCFG(f)
         expected = textwrap.dedent("""
             '0':
               instructions:
@@ -47,14 +48,13 @@ class TestASTConversion(TestCase):
               - return x
               jump_targets: []
               name: '0'""")
-        self.assertEqual(astcfg.to_dict(), yaml.safe_load(expected))
+        self.compare(function, expected)
 
     def test_if_return(self):
-        def f(x: int):
+        def function(x: int):
             if x < 10:
                 return 1
             return 2
-        astcfg = handler.generate_ASTCFG(f)
         expected = textwrap.dedent("""
             '0':
               instructions:
@@ -79,15 +79,14 @@ class TestASTConversion(TestCase):
               jump_targets: []
               name: '3'
               """)
-        self.assertEqual(astcfg.to_dict(), yaml.safe_load(expected))
+        self.compare(function, expected)
 
     def test_if_else_return(self):
-        def f(x: int):
+        def function(x: int):
             if x < 10:
                 return 1
             else:
                 return 2
-        astcfg = handler.generate_ASTCFG(f)
         expected = textwrap.dedent("""
             '0':
               instructions:
@@ -112,7 +111,7 @@ class TestASTConversion(TestCase):
               jump_targets: []
               name: '3'
               """)
-        self.assertEqual(astcfg.to_dict(), yaml.safe_load(expected))
+        self.compare(function, expected)
 
 
 if __name__ == "__main__":
