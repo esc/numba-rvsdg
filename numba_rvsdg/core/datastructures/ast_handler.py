@@ -273,75 +273,10 @@ class ASTHandler:
         intermediary results.
 
         """
-        render_scfg(self.to_SCFG())
+        render_scfg(self.blocks.to_SCFG())
 
 
-def acc():
-    r = 0
-    for i in range(10):
-        r = r + 1
-    return r
 
-
-def branch01(x: int) -> None:
-    if x < 10:
-        return 1
-    return 2
-
-
-def branch02(x: int, y: int, a: int, b: int) -> None:
-    if x < 10:
-        y = a + b
-    z = a - b
-
-
-def branch03(x: int, a: int, b: int) -> None:
-    if x < 10:
-        return
-    else:
-        y = b - a
-    return y
-
-
-def branch04(x: int, y: int, a: int, b: int) -> None:
-    if x < 10:
-        if y < 5:
-            y = a - b
-        else:
-            y = 2 * a
-    else:
-        if y < 15:
-            y = b - a
-        else:
-            y = b ** 2
-    return y
-
-
-def branch05(x: int, y: int, a: int, b: int) -> None:
-    y << 2
-    if x < 10:
-        y -= 1
-        if y < 5:
-            y = a - b
-    else:
-        if y < 15:
-            y = b - a
-        else:
-            return
-        y += 1
-    return y
-
-
-def branch06(x: int, a: int, b: int) -> None:
-    if x < 10:
-        return
-    elif x < 15:
-        y = b - a
-    elif x < 20:
-        y = a ** 2
-    else:
-        y = a - b
-    return y
 
 def branch07(x: int, a: int, b: int) -> None:
     if y < 5:
