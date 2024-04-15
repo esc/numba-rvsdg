@@ -1,8 +1,7 @@
 import ast
 import inspect
 from typing import Callable
-
-import yaml
+import textwrap
 
 from numba_rvsdg.core.datastructures.scfg import SCFG
 from numba_rvsdg.core.datastructures.basic_block import PythonASTBlock
@@ -54,21 +53,6 @@ class WriteableBasicBlock:
 class ASTCFG(dict):
     """ A CFG consisting of WriteableBasicBlocks. """
 
-    def to_dict(self) -> dict[str, dict[str, object]]:
-        """ Convert ASTCFG to simple dict based datastructure. """
-        return {k: {"name": v.name,
-                    "instructions": [ast.unparse(n) for n in v.instructions],
-                    "jump_targets": v.jump_targets,
-                    } for (k, v) in self.items()}
-
-    def to_yaml(self) -> str:
-        """ Serialize ASTCFG to yaml. """
-        return yaml.dump(self.to_dict())
-
-    def from_yaml(self, serialized: str) -> None:
-        """ Load ASTCFG from yaml. """
-        return yaml.load(serialized)
-
     def convert_blocks(self) -> dict[str, PythonASTBlock]:
         """ Convert WriteableBasicBlocks to PythonASTBlocks.  """
         return {v.name:
@@ -78,7 +62,14 @@ class ASTCFG(dict):
                     _jump_targets=tuple(v.jump_targets))
                 for v in self.values()}
 
-    def to_scfg(self):
+    def to_dict(self) -> dict[str, dict[str, object]]:
+        """ Convert ASTCFG to simple dict based datastructure. """
+        return {k: {"name": v.name,
+                    "instructions": [ast.unparse(n) for n in v.instructions],
+                    "jump_targets": v.jump_targets,
+                    } for (k, v) in self.items()}
+
+    def to_SCFG(self):
         return SCFG(graph=self.convert_blocks())
 
 
@@ -114,17 +105,23 @@ class ASTHandler:
         # Initialize loop stacks
         self.loop_head_stack, self.loop_exit_stack = [], []
 
-    def handle(self, code: Callable) -> SCFG:
+    def handle(self, code: Callable) -> None:
         """Create an SCFG from a Python function. """
         self.reset()
         # Convert source code into AST
-        tree = ast.parse(inspect.getsource(code)).body
+        tree = ast.parse(textwrap.dedent(inspect.getsource(code))).body
         # Assert that the code handed in was a function, we can only convert
         # functions.
         assert isinstance(tree[0], ast.FunctionDef)
         # Run recrisive code generation
         self.codegen(tree)
-        # Create SCFG using PythonASTBlocks and return
+
+    def generate_ASTCFG(self, code: Callable) -> ASTCFG:
+        self.handle(code)
+        return self.blocks
+
+    def genarete_SCFG(self, code: Callable) -> SCFG:
+        self.handle(code)
         return self.blocks.to_scfg()
 
     def codegen(self, tree: list[ast.AST]) -> None:
@@ -427,7 +424,7 @@ def loop_continue():
 #        return 2
 #    return 0
 
-
-h = ASTHandler()
-s = h.handle(loop_break)
-render_scfg(s)
+if __name__ == "__main__":
+    h = ASTHandler()
+    s = h.to_SCFG(loop_continue)
+    render_scfg(s)
