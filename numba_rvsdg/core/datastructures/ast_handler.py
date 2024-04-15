@@ -68,25 +68,35 @@ class ASTHandler:
 
     """
 
-    def __init__(self, code: Callable) -> None:
-        # Source code to convert
-        self.code = code
+    def __init__(self) -> None:
         # Monotonically increasing block index
-        self.block_index = 1
+        self.block_index: int = None
         # Dict mapping block indices as strings to WriteableBasicBlocks
         # (This is the datastructure to hold the CFG.)
+        self.blocks: dict[str, WriteableBasicBlock] = None
+        # Current block being written to
+        self.current_block: WriteableBasicBlock = None
+        # Stacks for header and exiting block of current loop
+        self.loop_head_stack: list[int] = None
+        self.loop_exit_stack: list[int] = None
+
+    def reset(self):
+        """ Reset the handler to initial state. """
+        # Block index starts at 1, 0 is reserved for the genesis block
+        self.block_index = 1
+        # Initialize blocks dict (CFG)
         self.blocks = {}
         # Initialize first (genesis) block, assume it's named zero
         # (This also initializes the self.current_block attribute.)
         self.add_block("0")
+        # Initialize loop stacks
+        self.loop_head_stack, self.loop_exit_stack = [], []
 
-        self.loop_head_stack = []
-        self.loop_exit_stack = []
-
-    def process(self) -> SCFG:
+    def handle(self, code: Callable) -> SCFG:
         """Create an SCFG from a Python function. """
+        self.reset()
         # Convert source code into AST
-        tree = ast.parse(inspect.getsource(self.code)).body
+        tree = ast.parse(inspect.getsource(code)).body
         # Assert that the code handed in was a function, we can only convert
         # functions.
         assert isinstance(tree[0], ast.FunctionDef)
@@ -115,7 +125,7 @@ class ASTHandler:
                                ast.Return,
                                ast.Break,
                                ast.Continue,
-                              )):
+                               )):
             self.current_block.instructions.append(node)
         elif isinstance(node, ast.If):
             self.handle_if(node)
@@ -396,7 +406,6 @@ def loop_continue():
 #    return 0
 
 
-h = ASTHandler(loop_break)
-s = h.process()
+h = ASTHandler()
+s = h.handle(loop_break)
 render_scfg(s)
-
