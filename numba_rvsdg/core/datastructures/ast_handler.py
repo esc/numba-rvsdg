@@ -106,7 +106,7 @@ class ASTHandler:
         self.loop_head_stack, self.loop_exit_stack = [], []
 
     def handle(self, code: Callable) -> None:
-        """Create an SCFG from a Python function. """
+        """Handle Python function. """
         self.reset()
         # Convert source code into AST
         tree = ast.parse(textwrap.dedent(inspect.getsource(code))).body
@@ -117,10 +117,12 @@ class ASTHandler:
         self.codegen(tree)
 
     def generate_ASTCFG(self, code: Callable) -> ASTCFG:
+        """ Generate ASTCFG from Python function. """
         self.handle(code)
         return self.blocks
 
     def generate_SCFG(self, code: Callable) -> SCFG:
+        """ Generate SCFG from Python function. """
         self.handle(code)
         return self.blocks.to_SCFG()
 
@@ -214,7 +216,6 @@ class ASTHandler:
         self.current_block.instructions.append(node.test)
         # Set the jump targets to be the body and the exiting latch
         self.current_block.set_jump_targets(body_index, exit_index)
-
 
         # Create body block
         self.add_block(body_index)
