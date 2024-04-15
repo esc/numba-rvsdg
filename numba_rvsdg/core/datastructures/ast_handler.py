@@ -210,18 +210,27 @@ class ASTHandler:
 
     def handle_while(self, node):
         """ Handle while statement. """
-        # Preallocate header, body and exiting indices
-        head_index = self.block_index
-        body_index = self.block_index + 1
-        exit_index = self.block_index + 2
-        self.block_index += 3
+        # If the current block already has instructions, we need a new block as
+        # header. Otherwise just re-use the current-block.
+        if self.current_block.instructions:
+            # Preallocate header, body and exiting indices
+            head_index = self.block_index
+            body_index = self.block_index + 1
+            exit_index = self.block_index + 2
+            self.block_index += 3
 
-        # Point whatever the current block to header block
-        self.current_block.set_jump_targets(head_index)
+            # Point whatever the current block to header block
+            self.current_block.set_jump_targets(head_index)
+            # And create new header block
+            self.add_block(head_index)
+        else:
+            # body and exiting indices
+            head_index = self.current_block.name
+            body_index = self.block_index
+            exit_index = self.block_index + 1
+            self.block_index += 2
 
-        # Create header block
-        self.add_block(head_index)
-        # Emit comparison expression into it
+        # Emit comparison expression into header
         self.current_block.instructions.append(node.test)
         # Set the jump targets to be the body and the exiting latch
         self.current_block.set_jump_targets(body_index, exit_index)

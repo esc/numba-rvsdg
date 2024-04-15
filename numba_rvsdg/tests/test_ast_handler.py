@@ -438,9 +438,11 @@ class TestASTConversion(TestCase):
               - '3'
               name: '1'
             '2':
-              instructions: []
+              instructions:
+              - y < 5
               jump_targets:
               - '4'
+              - '5'
               name: '2'
             '3':
               instructions:
@@ -449,24 +451,17 @@ class TestASTConversion(TestCase):
               name: '3'
             '4':
               instructions:
-              - y < 5
+              - x += 1
+              - y += 1
               jump_targets:
-              - '5'
-              - '6'
+              - '2'
               name: '4'
             '5':
               instructions:
               - x += 1
-              - y += 1
-              jump_targets:
-              - '4'
-              name: '5'
-            '6':
-              instructions:
-              - x += 1
               jump_targets:
               - '1'
-              name: '6'
+              name: '5'
             """)
         self.compare(function, expected)
 
@@ -547,13 +542,17 @@ class TestASTConversion(TestCase):
               - '2'
               name: '0'
             '1':
-              instructions: []
+              instructions:
+              - x < 10
               jump_targets:
               - '4'
+              - '5'
               name: '1'
             '2':
-              instructions: []
+              instructions:
+              - x < 10
               jump_targets:
+              - '6'
               - '7'
               name: '2'
             '3':
@@ -563,40 +562,26 @@ class TestASTConversion(TestCase):
               name: '3'
             '4':
               instructions:
-              - x < 10
-              jump_targets:
-              - '5'
-              - '6'
-              name: '4'
-            '5':
-              instructions:
               - x += 2
               jump_targets:
-              - '4'
-              name: '5'
-            '6':
+              - '1'
+              name: '4'
+            '5':
               instructions: []
               jump_targets:
               - '3'
-              name: '6'
-            '7':
-              instructions:
-              - x < 10
-              jump_targets:
-              - '8'
-              - '9'
-              name: '7'
-            '8':
+              name: '5'
+            '6':
               instructions:
               - x += 1
               jump_targets:
-              - '7'
-              name: '8'
-            '9':
+              - '2'
+              name: '6'
+            '7':
               instructions: []
               jump_targets:
               - '3'
-              name: '9'
+              name: '7'
             """)
         self.compare(function, expected)
 
