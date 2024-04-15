@@ -244,13 +244,12 @@ class ASTHandler:
 
         # Recurse into it
         self.codegen(node.body)
+        # After recursion, seal current block
+        self.seal(head_index)
 
         # pop values from loop stack post recursion
         self.loop_head_stack.pop()
         self.loop_exit_stack.pop()
-
-        # After recursion, seal current block
-        self.seal(head_index)
 
         # Create exit block
         self.add_block(exit_index)
