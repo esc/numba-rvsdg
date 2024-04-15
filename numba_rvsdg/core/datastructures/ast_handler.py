@@ -171,7 +171,8 @@ class ASTHandler:
             node.body.append(ast.Return(None))
         self.codegen(node.body)
 
-    def seal(self, default_index):
+    def seal(self, default_index) -> None:
+        """ Seal the current block by setting the jump_targets. """
         self.current_block.seal(
             self.loop_head_stack[-1] if self.loop_head_stack else -1,
             self.loop_exit_stack[-1] if self.loop_exit_stack else -1,
