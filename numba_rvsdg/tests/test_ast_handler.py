@@ -379,6 +379,227 @@ class TestASTConversion(TestCase):
             """)
         self.compare(function, expected)
 
+    def test_simple_loop(self):
+        def function() -> None:
+            x = 0
+            while x < 10:
+                x += 1
+            return x
+        expected = textwrap.dedent("""
+            '0':
+              instructions:
+              - x = 0
+              jump_targets:
+              - '1'
+              name: '0'
+            '1':
+              instructions:
+              - x < 10
+              jump_targets:
+              - '2'
+              - '3'
+              name: '1'
+            '2':
+              instructions:
+              - x += 1
+              jump_targets:
+              - '1'
+              name: '2'
+            '3':
+              instructions:
+              - return x
+              jump_targets: []
+              name: '3'
+            """)
+        self.compare(function, expected)
+
+    def test_nested_loop(self):
+        def function() -> tuple[int, int]:
+            x, y = 0, 0
+            while x < 10:
+                while y < 5:
+                    x += 1
+                    y += 1
+                x += 1
+            return x, y
+
+        expected = textwrap.dedent("""
+            '0':
+              instructions:
+              - x, y = (0, 0)
+              jump_targets:
+              - '1'
+              name: '0'
+            '1':
+              instructions:
+              - x < 10
+              jump_targets:
+              - '2'
+              - '3'
+              name: '1'
+            '2':
+              instructions: []
+              jump_targets:
+              - '4'
+              name: '2'
+            '3':
+              instructions:
+              - return (x, y)
+              jump_targets: []
+              name: '3'
+            '4':
+              instructions:
+              - y < 5
+              jump_targets:
+              - '5'
+              - '6'
+              name: '4'
+            '5':
+              instructions:
+              - x += 1
+              - y += 1
+              jump_targets:
+              - '4'
+              name: '5'
+            '6':
+              instructions:
+              - x += 1
+              jump_targets:
+              - '1'
+              name: '6'
+            """)
+        self.compare(function, expected)
+
+    def test_if_in_loop(self):
+        def function() -> tuple[int, int]:
+            x = 0
+            while x < 10:
+                if x < 5:
+                    x += 2
+                else:
+                    x += 1
+            return x
+
+        expected = textwrap.dedent("""
+            '0':
+              instructions:
+              - x = 0
+              jump_targets:
+              - '1'
+              name: '0'
+            '1':
+              instructions:
+              - x < 10
+              jump_targets:
+              - '2'
+              - '3'
+              name: '1'
+            '2':
+              instructions:
+              - x < 5
+              jump_targets:
+              - '4'
+              - '5'
+              name: '2'
+            '3':
+              instructions:
+              - return x
+              jump_targets: []
+              name: '3'
+            '4':
+              instructions:
+              - x += 2
+              jump_targets:
+              - '6'
+              name: '4'
+            '5':
+              instructions:
+              - x += 1
+              jump_targets:
+              - '6'
+              name: '5'
+            '6':
+              instructions: []
+              jump_targets:
+              - '1'
+              name: '6'
+            """)
+        self.compare(function, expected)
+
+    def test_loop_in_if(self):
+        def function(a: bool) -> tuple[int, int]:
+            x = 0
+            if a is True:
+                while x < 10:
+                    x += 2
+            else:
+                while x < 10:
+                    x += 1
+            return x
+
+        expected = textwrap.dedent("""
+            '0':
+              instructions:
+              - x = 0
+              - a is True
+              jump_targets:
+              - '1'
+              - '2'
+              name: '0'
+            '1':
+              instructions: []
+              jump_targets:
+              - '4'
+              name: '1'
+            '2':
+              instructions: []
+              jump_targets:
+              - '7'
+              name: '2'
+            '3':
+              instructions:
+              - return x
+              jump_targets: []
+              name: '3'
+            '4':
+              instructions:
+              - x < 10
+              jump_targets:
+              - '5'
+              - '6'
+              name: '4'
+            '5':
+              instructions:
+              - x += 2
+              jump_targets:
+              - '4'
+              name: '5'
+            '6':
+              instructions: []
+              jump_targets:
+              - '3'
+              name: '6'
+            '7':
+              instructions:
+              - x < 10
+              jump_targets:
+              - '8'
+              - '9'
+              name: '7'
+            '8':
+              instructions:
+              - x += 1
+              jump_targets:
+              - '7'
+              name: '8'
+            '9':
+              instructions: []
+              jump_targets:
+              - '3'
+              name: '9'
+            """)
+        self.compare(function, expected)
+
 
 if __name__ == "__main__":
     main()
