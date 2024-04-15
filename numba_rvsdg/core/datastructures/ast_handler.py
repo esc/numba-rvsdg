@@ -2,6 +2,7 @@ import ast
 import inspect
 from typing import Callable
 
+import yaml
 
 from numba_rvsdg.core.datastructures.scfg import SCFG
 from numba_rvsdg.core.datastructures.basic_block import PythonASTBlock
@@ -50,14 +51,35 @@ class WriteableBasicBlock:
         return f"WriteableBasicBlock({self.name}, {self.instructions}, {self.jump_targets})"
 
 
-def convert(blocks: dict[str, WriteableBasicBlock]
-            ) -> dict[str, PythonASTBlock]:
-    """ Convert CFG of WriteableBasicBlocks to CFG of PythonASTBlocks.  """
-    return {v.name: PythonASTBlock(
-        v.name,
-        tree=v.instructions,
-        _jump_targets=tuple(v.jump_targets))
-        for v in blocks.values()}
+class ASTCFG(dict):
+    """ A CFG consisting of WriteableBasicBlocks. """
+
+    def to_dict(self) -> dict[str, dict[str, object]]:
+        """ Convert ASTCFG to simple dict based datastructure. """
+        return {k: {"name": v.name,
+                    "instructions": [ast.unparse(n) for n in v.instructions],
+                    "jump_targets": v.jump_targets,
+                    } for (k, v) in self.items()}
+
+    def to_yaml(self) -> str:
+        """ Serialize ASTCFG to yaml. """
+        return yaml.dump(self.to_dict())
+
+    def from_yaml(self, serialized: str) -> None:
+        """ Load ASTCFG from yaml. """
+        return yaml.load(serialized)
+
+    def convert_blocks(self) -> dict[str, PythonASTBlock]:
+        """ Convert WriteableBasicBlocks to PythonASTBlocks.  """
+        return {v.name:
+                PythonASTBlock(
+                    v.name,
+                    tree=v.instructions,
+                    _jump_targets=tuple(v.jump_targets))
+                for v in self.values()}
+
+    def to_scfg(self):
+        return SCFG(graph=self.convert_blocks())
 
 
 class ASTHandler:
@@ -73,7 +95,7 @@ class ASTHandler:
         self.block_index: int = None
         # Dict mapping block indices as strings to WriteableBasicBlocks
         # (This is the datastructure to hold the CFG.)
-        self.blocks: dict[str, WriteableBasicBlock] = None
+        self.blocks: ASTCFG = None
         # Current block being written to
         self.current_block: WriteableBasicBlock = None
         # Stacks for header and exiting block of current loop
@@ -85,7 +107,7 @@ class ASTHandler:
         # Block index starts at 1, 0 is reserved for the genesis block
         self.block_index = 1
         # Initialize blocks dict (CFG)
-        self.blocks = {}
+        self.blocks = ASTCFG()
         # Initialize first (genesis) block, assume it's named zero
         # (This also initializes the self.current_block attribute.)
         self.add_block("0")
@@ -103,7 +125,7 @@ class ASTHandler:
         # Run recrisive code generation
         self.codegen(tree)
         # Create SCFG using PythonASTBlocks and return
-        return SCFG(graph=convert(self.blocks))
+        return self.blocks.to_scfg()
 
     def codegen(self, tree: list[ast.AST]) -> None:
         """Recursively Generate code from a list of AST nodes. """
