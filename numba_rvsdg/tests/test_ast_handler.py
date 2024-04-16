@@ -17,37 +17,46 @@ class TestASTConversion(TestCase):
     def test_solo_return(self):
         def function() -> int:
             return 1
-        expected = textwrap.dedent("""
+
+        expected = textwrap.dedent(
+            """
             '0':
               instructions:
               - return 1
               jump_targets: []
-              name: '0'""")
+              name: '0'"""
+        )
         self.compare(function, expected)
 
     def test_solo_assign(self):
         def function() -> None:
             x = 1  # noqa: F841
-        expected = textwrap.dedent("""
+
+        expected = textwrap.dedent(
+            """
             '0':
               instructions:
               - x = 1
               - return
               jump_targets: []
-              name: '0'""")
+              name: '0'"""
+        )
         self.compare(function, expected)
 
     def test_assign_return(self):
         def function() -> int:
             x = 1
             return x
-        expected = textwrap.dedent("""
+
+        expected = textwrap.dedent(
+            """
             '0':
               instructions:
               - x = 1
               - return x
               jump_targets: []
-              name: '0'""")
+              name: '0'"""
+        )
         self.compare(function, expected)
 
     def test_if_return(self):
@@ -55,7 +64,9 @@ class TestASTConversion(TestCase):
             if x < 10:
                 return 1
             return 2
-        expected = textwrap.dedent("""
+
+        expected = textwrap.dedent(
+            """
             '0':
               instructions:
               - x < 10
@@ -78,7 +89,8 @@ class TestASTConversion(TestCase):
               - return 2
               jump_targets: []
               name: '3'
-              """)
+              """
+        )
         self.compare(function, expected)
 
     def test_if_else_return(self):
@@ -87,7 +99,9 @@ class TestASTConversion(TestCase):
                 return 1
             else:
                 return 2
-        expected = textwrap.dedent("""
+
+        expected = textwrap.dedent(
+            """
             '0':
               instructions:
               - x < 10
@@ -110,7 +124,8 @@ class TestASTConversion(TestCase):
               - return
               jump_targets: []
               name: '3'
-              """)
+              """
+        )
         self.compare(function, expected)
 
     def test_if_else_assign(self):
@@ -120,7 +135,9 @@ class TestASTConversion(TestCase):
             else:
                 z = 2
             return z
-        expected = textwrap.dedent("""
+
+        expected = textwrap.dedent(
+            """
             '0':
               instructions:
               - x < 10
@@ -145,7 +162,8 @@ class TestASTConversion(TestCase):
               - return z
               jump_targets: []
               name: '3'
-              """)
+              """
+        )
         self.compare(function, expected)
 
     def test_nested_if(self):
@@ -161,7 +179,9 @@ class TestASTConversion(TestCase):
                 else:
                     y = 4
             return y
-        expected = textwrap.dedent("""
+
+        expected = textwrap.dedent(
+            """
             '0':
               instructions:
               - x < 10
@@ -222,7 +242,8 @@ class TestASTConversion(TestCase):
               jump_targets:
               - '3'
               name: '9'
-              """)
+              """
+        )
         self.compare(function, expected)
 
     def test_nested_if_with_empty_else_and_return(self):
@@ -239,7 +260,9 @@ class TestASTConversion(TestCase):
                     return
                 y += 1
             return y
-        expected = textwrap.dedent("""
+
+        expected = textwrap.dedent(
+            """
             '0':
               instructions:
               - y << 2
@@ -301,7 +324,8 @@ class TestASTConversion(TestCase):
               jump_targets:
               - '3'
               name: '9'
-            """)
+            """
+        )
         self.compare(function, expected)
 
     def test_elif(self):
@@ -312,11 +336,13 @@ class TestASTConversion(TestCase):
             elif x < 15:
                 y = b - a
             elif x < 20:
-                y = a ** 2
+                y = a**2
             else:
                 y = a - b
             return y
-        expected = textwrap.dedent("""
+
+        expected = textwrap.dedent(
+            """
             '0':
               instructions:
               - x < 10
@@ -376,7 +402,8 @@ class TestASTConversion(TestCase):
               jump_targets:
               - '6'
               name: '9'
-            """)
+            """
+        )
         self.compare(function, expected)
 
     def test_simple_loop(self):
@@ -385,7 +412,9 @@ class TestASTConversion(TestCase):
             while x < 10:
                 x += 1
             return x
-        expected = textwrap.dedent("""
+
+        expected = textwrap.dedent(
+            """
             '0':
               instructions:
               - x = 0
@@ -410,7 +439,8 @@ class TestASTConversion(TestCase):
               - return x
               jump_targets: []
               name: '3'
-            """)
+            """
+        )
         self.compare(function, expected)
 
     def test_nested_loop(self):
@@ -423,7 +453,8 @@ class TestASTConversion(TestCase):
                 x += 1
             return x, y
 
-        expected = textwrap.dedent("""
+        expected = textwrap.dedent(
+            """
             '0':
               instructions:
               - x, y = (0, 0)
@@ -462,7 +493,8 @@ class TestASTConversion(TestCase):
               jump_targets:
               - '1'
               name: '5'
-            """)
+            """
+        )
         self.compare(function, expected)
 
     def test_if_in_loop(self):
@@ -475,7 +507,8 @@ class TestASTConversion(TestCase):
                     x += 1
             return x
 
-        expected = textwrap.dedent("""
+        expected = textwrap.dedent(
+            """
             '0':
               instructions:
               - x = 0
@@ -518,7 +551,8 @@ class TestASTConversion(TestCase):
               jump_targets:
               - '1'
               name: '6'
-            """)
+            """
+        )
         self.compare(function, expected)
 
     def test_loop_in_if(self):
@@ -532,7 +566,8 @@ class TestASTConversion(TestCase):
                     x += 1
             return x
 
-        expected = textwrap.dedent("""
+        expected = textwrap.dedent(
+            """
             '0':
               instructions:
               - x = 0
@@ -582,7 +617,8 @@ class TestASTConversion(TestCase):
               jump_targets:
               - '3'
               name: '7'
-            """)
+            """
+        )
         self.compare(function, expected)
 
     def test_loop_break_continue(self):
@@ -598,7 +634,8 @@ class TestASTConversion(TestCase):
                     x += 1
             return x
 
-        expected = textwrap.dedent("""
+        expected = textwrap.dedent(
+            """
             '0':
               instructions:
               - x = 0
@@ -660,7 +697,8 @@ class TestASTConversion(TestCase):
               jump_targets:
               - '6'
               name: '9'
-            """)
+            """
+        )
         self.compare(function, expected)
 
 

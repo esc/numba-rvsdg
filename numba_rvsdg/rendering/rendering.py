@@ -282,14 +282,14 @@ class SCFGRenderer(BaseRenderer):
     def render_python_ast_block(
         self, digraph: "Digraph", name: str, block: BasicBlock
     ) -> None:
-        code = "\l".join((ast.unparse(n) for n in block.get_tree()))
+        code = r"\l".join(ast.unparse(n) for n in block.get_tree())
         body = (
             name
             + "\n\n"
             + code
-            + "\l\ljump targets: "
+            + r"\l\ljump targets: "
             + str(block.jump_targets)
-            + "\lback edges: "
+            + r"\lback edges: "
             + str(block.backedges)
         )
 
@@ -340,7 +340,6 @@ class SCFGRenderer(BaseRenderer):
             self.render_block(self.g, name, block)
         self.render_edges(self.scfg)
         return self.g
-
 
     def view(self, name: Optional[str] = None) -> None:
         """Method used to view the current SCFG as an external graphviz
