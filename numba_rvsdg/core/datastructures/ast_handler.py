@@ -20,8 +20,8 @@ class WriteableBasicBlock:
     def __init__(
         self,
         name: str,
-        instructions: list[ast.AST] | None = None,
-        jump_targets: list[str] | None = None,
+        instructions: list[ast.AST] = None,
+        jump_targets: list[str] = None,
     ) -> None:
         self.name = name
         self.instructions = [] if instructions is None else instructions
@@ -61,7 +61,7 @@ class WriteableBasicBlock:
         )
 
 
-class ASTCFG(dict):
+class ASTCFG(dict[str, WriteableBasicBlock]):
     """A CFG consisting of WriteableBasicBlocks."""
 
     def convert_blocks(self) -> dict[str, PythonASTBlock]:
@@ -92,7 +92,7 @@ class ASTCFG(dict):
 
         return yaml.dump(self.to_dict())
 
-    def to_SCFG(self):
+    def to_SCFG(self) -> SCFG:
         """Convert ASTCFG to SCFG"""
         return SCFG(graph=self.convert_blocks())
 
@@ -117,7 +117,7 @@ class ASTHandler:
         self.loop_head_stack: list[int] | None = None
         self.loop_exit_stack: list[int] | None = None
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset the handler to initial state."""
         # Block index starts at 1, 0 is reserved for the genesis block
         self.block_index = 1
@@ -125,11 +125,11 @@ class ASTHandler:
         self.blocks = ASTCFG()
         # Initialize first (genesis) block, assume it's named zero
         # (This also initializes the self.current_block attribute.)
-        self.add_block("0")
+        self.add_block(0)
         # Initialize loop stacks
         self.loop_head_stack, self.loop_exit_stack = [], []
 
-    def handle(self, code: Callable) -> None:
+    def handle(self, code: Callable[..., Any]) -> None:
         """Handle Python function."""
         self.reset()
         # Convert source code into AST
@@ -140,12 +140,12 @@ class ASTHandler:
         # Run recrisive code generation
         self.codegen(tree)
 
-    def generate_ASTCFG(self, code: Callable) -> ASTCFG:
+    def generate_ASTCFG(self, code: Callable[..., Any]) -> ASTCFG:
         """Generate ASTCFG from Python function."""
         self.handle(code)
         return self.blocks
 
-    def generate_SCFG(self, code: Callable) -> SCFG:
+    def generate_SCFG(self, code: Callable[..., Any]) -> SCFG:
         """Generate SCFG from Python function."""
         self.handle(code)
         return self.blocks.to_SCFG()

@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 from unittest import main, TestCase
 import textwrap
 import yaml
