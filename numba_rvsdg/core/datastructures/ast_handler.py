@@ -290,7 +290,8 @@ class ASTHandler:
         iter_assign = "ITER"
 
         # Emit iter setup to pre-header
-        preheader_code = textwrap.dedent(f"""
+        preheader_code = textwrap.dedent(
+            f"""
             {iter_assign} = {iter_setup}
         """
         )
@@ -303,7 +304,8 @@ class ASTHandler:
         self.add_block(head_index)
 
         # Emit header instructions
-        header_code = textwrap.dedent(f"""
+        header_code = textwrap.dedent(
+            f"""
             {target} = next({iter_assign}, "SENTINEL")
             {target} != "SENTINEL"
         """
