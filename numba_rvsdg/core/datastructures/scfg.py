@@ -164,7 +164,7 @@ class SCFG(Sized):
         regions, and variables.
     """
 
-    graph: Dict[str, BasicBlock] = field(default_factory=dict)
+    graph: Mapping[str, BasicBlock] = field(default_factory=dict)
 
     name_gen: NameGenerator = field(
         default_factory=NameGenerator, compare=False

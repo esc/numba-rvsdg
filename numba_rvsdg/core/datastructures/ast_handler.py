@@ -34,7 +34,7 @@ class WriteableBasicBlock:
     def set_jump_targets(self, *indices: int) -> None:
         self.jump_targets = [str(a) for a in indices]
 
-    def is_instruction(self, instruction: ast.AST) -> bool:
+    def is_instruction(self, instruction: type[ast.AST]) -> bool:
         return len(self.instructions) > 0 and isinstance(
             self.instructions[-1], instruction
         )
@@ -111,15 +111,15 @@ class ASTHandler:
 
     def __init__(self) -> None:
         # Monotonically increasing block index
-        self.block_index: int = None
+        self.block_index: int = 0
         # Dict mapping block indices as strings to WriteableBasicBlocks
         # (This is the datastructure to hold the CFG.)
-        self.blocks: ASTCFG = None
+        self.blocks: ASTCFG = ASTCFG()
         # Current block being written to
-        self.current_block: WriteableBasicBlock = None
+        self.current_block: WriteableBasicBlock = WriteableBasicBlock("BAD")
         # Stacks for header and exiting block of current loop
-        self.loop_head_stack: list[int] = None
-        self.loop_exit_stack: list[int] = None
+        self.loop_head_stack: list[int] = []
+        self.loop_exit_stack: list[int] = []
 
     def reset(self) -> None:
         """Reset the handler to initial state."""
@@ -154,7 +154,7 @@ class ASTHandler:
         self.handle(code)
         return self.blocks.to_SCFG()
 
-    def codegen(self, tree: list[ast.AST]) -> None:
+    def codegen(self, tree: list[type[ast.AST]] | list[ast.stmt]) -> None:
         """Recursively Generate code from a list of AST nodes."""
         for node in tree:
             self.handle_ast_node(node)
@@ -165,7 +165,7 @@ class ASTHandler:
             name=str(index)
         )
 
-    def handle_ast_node(self, node: ast.AST) -> None:
+    def handle_ast_node(self, node: type[ast.AST] | ast.stmt) -> None:
         """Dispatch an AST node to handler."""
         if isinstance(node, ast.FunctionDef):
             self.handle_function_def(node)
