@@ -277,6 +277,61 @@ class ASTHandler:
         # Create exit block
         self.add_block(exit_index)
 
+    def handle_for(self, node: ast.AST) -> None:
+        # Preallocate indices for blocks
+        head_index = self.block_index
+        body_index = self.block_index + 1
+        exit_index = self.block_index + 2
+        self.block_index += 3
+
+        # Assign the components of the for-loop to variables
+        target = ast.unparse(node.target)
+        iter_setup = ast.unparse(node.iter)
+        iter_assign = "ITER"
+
+        # Emit iter setup to pre-header
+        preheader_code = textwrap.dedent(f"""
+            {iter_assign} = {iter_setup}
+        """
+        )
+        for i in ast.parse(preheader_code).body:
+            self.current_block.instructions.append(i)
+
+        # Point whatever the current block to header block
+        self.current_block.set_jump_targets(head_index)
+        # And create new header block
+        self.add_block(head_index)
+
+        # Emit header instructions
+        header_code = textwrap.dedent(f"""
+            {target} = next({iter_assign}, "SENTINEL")
+            {target} != "SENTINEL"
+        """
+        )
+        for i in ast.parse(header_code).body:
+            self.current_block.instructions.append(i)
+        # Set the jump targets to be the body and the exiting latch
+        self.current_block.set_jump_targets(body_index, exit_index)
+
+        # Create body block
+        self.add_block(body_index)
+
+        # setup loop stacks for recursion
+        self.loop_head_stack.append(head_index)
+        self.loop_exit_stack.append(exit_index)
+
+        # Recurse into it
+        self.codegen(node.body)
+        # After recursion, seal current block
+        self.seal(head_index)
+
+        # pop values from loop stack post recursion
+        self.loop_head_stack.pop()
+        self.loop_exit_stack.pop()
+
+        # Create exit block
+        self.add_block(exit_index)
+
     def prune_empty(self):
         for i in list(self.blocks.values()):
             if not i.instructions:
@@ -309,18 +364,14 @@ class ASTHandler:
 
 if __name__ == "__main__":
 
-    def function(a: int, b: int) -> int:
-        x = a + b
-        if x < 10:
-            if x < 2:
-                return 1
+    def function() -> int:
+        j = 0
+        for i in range(10):
+            if i % 2 == 0:
+                continue
             else:
-                return 2
-        else:
-            if x < 5:
-                return 3
-            else:
-                return 4
+                j += 1
+        return j
 
     h = ASTHandler()
     s = h.generate_SCFG(function)
