@@ -29,7 +29,9 @@ class WriteableBasicBlock:
     def set_jump_targets(self, *indices: int) -> None:
         self.jump_targets = [str(a) for a in indices]
 
-    def is_instruction(self, instruction: ast.AST) -> bool:
+    def is_instruction(
+        self, instruction: ast.Return | ast.Continue | ast.Break
+    ) -> bool:
         return len(self.instructions) > 0 and isinstance(
             self.instructions[-1], instruction
         )
@@ -54,9 +56,10 @@ class WriteableBasicBlock:
             self.set_jump_targets(dflt_index)
 
     def __repr__(self) -> str:
-        return (f"WriteableBasicBlock({self.name}, "
-                "{self.instructions}, {self.jump_targets})"
-                )
+        return (
+            f"WriteableBasicBlock({self.name}, "
+            "{self.instructions}, {self.jump_targets})"
+        )
 
 
 class ASTCFG(dict):
