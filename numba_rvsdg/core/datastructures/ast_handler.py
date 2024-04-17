@@ -30,7 +30,7 @@ class WriteableBasicBlock:
     def set_jump_targets(self, *indices: int) -> None:
         self.jump_targets = [str(a) for a in indices]
 
-    def is_instruction(self, instruction: Any) -> bool:
+    def is_instruction(self, instruction: ast.AST) -> bool:
         return len(self.instructions) > 0 and isinstance(
             self.instructions[-1], instruction
         )
@@ -107,15 +107,15 @@ class ASTHandler:
 
     def __init__(self) -> None:
         # Monotonically increasing block index
-        self.block_index: int | None = None
+        self.block_index: int = None
         # Dict mapping block indices as strings to WriteableBasicBlocks
         # (This is the datastructure to hold the CFG.)
-        self.blocks: ASTCFG | None = None
+        self.blocks: ASTCFG = None
         # Current block being written to
-        self.current_block: WriteableBasicBlock | None = None
+        self.current_block: WriteableBasicBlock = None
         # Stacks for header and exiting block of current loop
-        self.loop_head_stack: list[int] | None = None
-        self.loop_exit_stack: list[int] | None = None
+        self.loop_head_stack: list[int] = None
+        self.loop_exit_stack: list[int] = None
 
     def reset(self) -> None:
         """Reset the handler to initial state."""
@@ -193,7 +193,7 @@ class ASTHandler:
             node.body.append(ast.Return(None))
         self.codegen(node.body)
 
-    def seal(self, default_index) -> None:
+    def seal(self, default_index: int) -> None:
         """Seal the current block by setting the jump_targets."""
         self.current_block.seal(
             self.loop_head_stack[-1] if self.loop_head_stack else -1,
@@ -231,7 +231,7 @@ class ASTHandler:
         # Create a new block for the end-if statements, if any
         self.add_block(enif_index)
 
-    def handle_while(self, node):
+    def handle_while(self, node: ast.While) -> None:
         """Handle while statement."""
         # If the current block already has instructions, we need a new block as
         # header. Otherwise just re-use the current-block.
@@ -248,7 +248,7 @@ class ASTHandler:
             self.add_block(head_index)
         else:
             # body and exiting indices
-            head_index = self.current_block.name
+            head_index = int(self.current_block.name)
             body_index = self.block_index
             exit_index = self.block_index + 1
             self.block_index += 2
@@ -277,7 +277,7 @@ class ASTHandler:
         # Create exit block
         self.add_block(exit_index)
 
-    def handle_for(self, node: ast.AST) -> None:
+    def handle_for(self, node: ast.For) -> None:
         # Preallocate indices for blocks
         head_index = self.block_index
         body_index = self.block_index + 1
@@ -334,7 +334,7 @@ class ASTHandler:
         # Create exit block
         self.add_block(exit_index)
 
-    def prune_empty(self):
+    def prune_empty(self) -> None:
         for i in list(self.blocks.values()):
             if not i.instructions:
                 self.blocks.pop(i.name)
@@ -354,7 +354,7 @@ class ASTHandler:
                         elif j.jump_targets[1] == i.name:
                             j.jump_targets[1] = it
 
-    def render(self):
+    def render(self) -> None:
         """Render the CFG contained in this handler as a SCFG.
 
         Useful for debugging purposes, set a breakpoint and then render to view
