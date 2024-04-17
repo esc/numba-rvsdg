@@ -239,7 +239,8 @@ class SCFG(Sized):
         """
         # initialise housekeeping datastructures
         try:
-            to_visit, seen = [self.find_head()], []
+            to_visit = [self.find_head()]
+            seen: list[str] = []
         except KeyError:
             to_visit, seen = ["0"], []
         while to_visit:
