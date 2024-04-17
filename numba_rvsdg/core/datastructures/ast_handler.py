@@ -20,12 +20,16 @@ class WriteableBasicBlock:
     def __init__(
         self,
         name: str,
-        instructions: list[ast.AST] = None,
-        jump_targets: list[str] = None,
+        instructions: list[ast.AST] | None = None,
+        jump_targets: list[str] | None = None,
     ) -> None:
         self.name = name
-        self.instructions = [] if instructions is None else instructions
-        self.jump_targets = [] if jump_targets is None else jump_targets
+        self.instructions: list[ast.AST] = (
+            [] if instructions is None else instructions
+        )
+        self.jump_targets: list[str] = (
+            [] if jump_targets is None else jump_targets
+        )
 
     def set_jump_targets(self, *indices: int) -> None:
         self.jump_targets = [str(a) for a in indices]
