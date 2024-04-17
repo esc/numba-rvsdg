@@ -73,7 +73,7 @@ class BaseRenderer:
         if type(block) == PythonBytecodeBlock:  # noqa: E721
             self.render_basic_block(digraph, name, block)
         if type(block) == PythonASTBlock:  # noqa: E721
-            self.render_python_ast_block(digraph, name, block)
+            self.render_python_ast_block(digraph, name, block)  # type: ignore
         elif type(block) == SyntheticAssignment:  # noqa: E721
             self.render_control_variable_block(digraph, name, block)
         elif isinstance(block, SyntheticBranch):
@@ -282,7 +282,9 @@ class SCFGRenderer(BaseRenderer):
     def render_python_ast_block(
         self, digraph: "Digraph", name: str, block: BasicBlock
     ) -> None:
-        code = r"\l".join(ast.unparse(n) for n in block.get_tree())
+        code = r"\l".join(
+            ast.unparse(n) for n in block.get_tree()  # type: ignore
+        )
         body = (
             name
             + "\n\n"
@@ -336,9 +338,9 @@ class SCFGRenderer(BaseRenderer):
 
     def render_scfg(self) -> "Digraph":
         """Renders the provided SCFG object."""
-        for name, block in self.scfg.graph.items():
+        for name, block in self.scfg.graph.items():  # type: ignore
             self.render_block(self.g, name, block)
-        self.render_edges(self.scfg)
+        self.render_edges(self.scfg)  # type: ignore
         return self.g
 
     def view(self, name: Optional[str] = None) -> None:
@@ -416,4 +418,4 @@ def render_scfg(scfg: SCFG) -> None:
         The structured control flow graph (SCFG) to be rendered.
     """
     # is this function used??
-    SCFGRenderer(scfg).view("scfg")  # type: ignore
+    SCFGRenderer(scfg).view("scfg")

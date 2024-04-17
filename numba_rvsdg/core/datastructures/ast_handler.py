@@ -3,7 +3,7 @@ import inspect
 from typing import Callable
 import textwrap
 
-from typing import Any
+from typing import Any, MutableMapping
 
 from numba_rvsdg.core.datastructures.scfg import SCFG
 from numba_rvsdg.core.datastructures.basic_block import PythonASTBlock
@@ -68,7 +68,7 @@ class WriteableBasicBlock:
 class ASTCFG(dict[str, WriteableBasicBlock]):
     """A CFG consisting of WriteableBasicBlocks."""
 
-    def convert_blocks(self) -> dict[str, PythonASTBlock]:
+    def convert_blocks(self) -> MutableMapping[str, Any]:
         """Convert WriteableBasicBlocks to PythonASTBlocks."""
         return {
             v.name: PythonASTBlock(
@@ -111,12 +111,12 @@ class ASTHandler:
 
     def __init__(self) -> None:
         # Monotonically increasing block index
-        self.block_index: int = 0
+        self.block_index: int = 1
         # Dict mapping block indices as strings to WriteableBasicBlocks
         # (This is the datastructure to hold the CFG.)
         self.blocks: ASTCFG = ASTCFG()
         # Current block being written to
-        self.current_block: WriteableBasicBlock = WriteableBasicBlock("BAD")
+        self.current_block: WriteableBasicBlock = WriteableBasicBlock("0")
         # Stacks for header and exiting block of current loop
         self.loop_head_stack: list[int] = []
         self.loop_exit_stack: list[int] = []

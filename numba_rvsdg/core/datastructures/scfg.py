@@ -10,6 +10,7 @@ from typing import (
     Optional,
     Generator,
     Mapping,
+    MutableMapping,
     Sized,
 )
 from textwrap import indent
@@ -164,7 +165,7 @@ class SCFG(Sized):
         regions, and variables.
     """
 
-    graph: Mapping[str, BasicBlock] = field(default_factory=dict)
+    graph: MutableMapping[str, BasicBlock] = field(default_factory=dict)
 
     name_gen: NameGenerator = field(
         default_factory=NameGenerator, compare=False
