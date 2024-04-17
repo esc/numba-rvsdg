@@ -3,6 +3,7 @@ import inspect
 from typing import Callable
 import textwrap
 
+from typing import Any
 
 from numba_rvsdg.core.datastructures.scfg import SCFG
 from numba_rvsdg.core.datastructures.basic_block import PythonASTBlock
@@ -29,9 +30,7 @@ class WriteableBasicBlock:
     def set_jump_targets(self, *indices: int) -> None:
         self.jump_targets = [str(a) for a in indices]
 
-    def is_instruction(
-        self, instruction: ast.Return | ast.Continue | ast.Break
-    ) -> bool:
+    def is_instruction(self, instruction: Any) -> bool:
         return len(self.instructions) > 0 and isinstance(
             self.instructions[-1], instruction
         )
