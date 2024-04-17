@@ -296,7 +296,7 @@ class ASTHandler:
         # Emit iter setup to pre-header
         preheader_code = textwrap.dedent(
             f"""
-            {iter_assign} = {iter_setup}
+            {iter_assign} = iter({iter_setup})
         """
         )
         for i in ast.parse(preheader_code).body:
