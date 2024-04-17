@@ -1,4 +1,5 @@
 import dis
+import ast
 from typing import Tuple, Dict, List, Optional
 from dataclasses import dataclass, replace, field
 
@@ -217,9 +218,9 @@ class PythonASTBlock(BasicBlock):
 
     end: int = -1
 
-    tree: List = field(default_factory=lambda: [])
+    tree: List[ast.AST] = field(default_factory=lambda: [])
 
-    def get_tree(self) -> None:
+    def get_tree(self) -> List[ast.AST]:
         return self.tree
 
 

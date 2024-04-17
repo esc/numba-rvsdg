@@ -19,8 +19,8 @@ class WriteableBasicBlock:
     def __init__(
         self,
         name: str,
-        instructions: list[ast.AST] = None,
-        jump_targets: list[str, str] = None,
+        instructions: list[ast.AST] | None = None,
+        jump_targets: list[str] | None = None,
     ) -> None:
         self.name = name
         self.instructions = [] if instructions is None else instructions
@@ -29,22 +29,21 @@ class WriteableBasicBlock:
     def set_jump_targets(self, *indices: int) -> None:
         self.jump_targets = [str(a) for a in indices]
 
-    def is_return(self) -> bool:
-        return self.instructions and isinstance(
-            self.instructions[-1], ast.Return
+    def is_instruction(self, instruction: ast.AST) -> bool:
+        return len(self.instructions) > 0 and isinstance(
+            self.instructions[-1], instruction
         )
+
+    def is_return(self) -> bool:
+        return self.is_instruction(ast.Return)
 
     def is_break(self) -> bool:
-        return self.instructions and isinstance(
-            self.instructions[-1], ast.Break
-        )
+        return self.is_instruction(ast.Break)
 
     def is_continue(self) -> bool:
-        return self.instructions and isinstance(
-            self.instructions[-1], ast.Continue
-        )
+        return self.is_instruction(ast.Continue)
 
-    def seal(self, head_index, exit_index, dflt_index):
+    def seal(self, head_index: int, exit_index: int, dflt_index: int) -> None:
         if self.is_continue():
             self.set_jump_targets(head_index)
         elif self.is_break():
@@ -55,7 +54,9 @@ class WriteableBasicBlock:
             self.set_jump_targets(dflt_index)
 
     def __repr__(self) -> str:
-        return f"WriteableBasicBlock({self.name}, {self.instructions}, {self.jump_targets})"
+        return (f"WriteableBasicBlock({self.name}, "
+                "{self.instructions}, {self.jump_targets})"
+                )
 
 
 class ASTCFG(dict):
@@ -104,15 +105,15 @@ class ASTHandler:
 
     def __init__(self) -> None:
         # Monotonically increasing block index
-        self.block_index: int = None
+        self.block_index: int | None = None
         # Dict mapping block indices as strings to WriteableBasicBlocks
         # (This is the datastructure to hold the CFG.)
-        self.blocks: ASTCFG = None
+        self.blocks: ASTCFG | None = None
         # Current block being written to
-        self.current_block: WriteableBasicBlock = None
+        self.current_block: WriteableBasicBlock | None = None
         # Stacks for header and exiting block of current loop
-        self.loop_head_stack: list[int] = None
-        self.loop_exit_stack: list[int] = None
+        self.loop_head_stack: list[int] | None = None
+        self.loop_exit_stack: list[int] | None = None
 
     def reset(self):
         """Reset the handler to initial state."""
