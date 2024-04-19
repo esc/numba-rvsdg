@@ -14,7 +14,8 @@ from numba_rvsdg.rendering.rendering import render_scfg
 class WritableASTBlock:
     """A basic block containing Python AST that can be written to.
 
-    The ast -> cfg algorithm requires a basic block that can be written to.
+    The recursive AST -> CFG algorithm requires a basic block that can be
+    written to.
 
     """
 
@@ -137,6 +138,7 @@ class ASTCFG(dict[str, WritableASTBlock]):
         for block in list(self.keys()):
             if block not in reachable:
                 unreachable.add(self.pop(block))
+        self.unreachable = unreachable
         return unreachable
 
     def prune_empty(self) -> set[WritableASTBlock]:
@@ -160,6 +162,7 @@ class ASTCFG(dict[str, WritableASTBlock]):
                             b.jump_targets[0] = it
                         elif b.jump_targets[1] == name:
                             b.jump_targets[1] = it
+        self.empty = empty
         return empty
 
 
@@ -174,7 +177,7 @@ class AST2SCFGTransformer:
     """AST2SCFGTransformer
 
     The AST2SCFGTransformer class is responsible for transforming code in the
-    form of a Python Abstract Syntax Tree (ast) into CFG/SCFG.
+    form of a Python Abstract Syntax Tree (AST) into CFG/SCFG.
 
     """
 
@@ -210,7 +213,7 @@ class AST2SCFGTransformer:
             name=str(index)
         )
 
-    def seal(self, default_index: int) -> None:
+    def seal_block(self, default_index: int) -> None:
         """Seal the current block by setting the jump_targets."""
         if self.loop_stack:
             self.current_block.seal_inside_loop(
@@ -290,14 +293,14 @@ class AST2SCFGTransformer:
         # Recursively process then branch
         self.codegen(node.body)
         # After recursion, current_block may need a jump target
-        self.seal(enif_index)
+        self.seal_block(enif_index)
 
         # Create a new block for the else branch
         self.add_block(else_index)
         # Recursively process else branch
         self.codegen(node.orelse)
         # After recursion, current_block may need a jump target
-        self.seal(enif_index)
+        self.seal_block(enif_index)
 
         # Create a new block for the end-if statements, if any
         self.add_block(enif_index)
@@ -338,7 +341,7 @@ class AST2SCFGTransformer:
         # Recurse into it
         self.codegen(node.body)
         # After recursion, seal current block
-        self.seal(head_index)
+        self.seal_block(head_index)
 
         # pop values from loop stack post recursion
         loop_indices = self.loop_stack.pop()
@@ -399,7 +402,7 @@ class AST2SCFGTransformer:
         # Recurse into it
         self.codegen(node.body)
         # After recursion, seal current block
-        self.seal(head_index)
+        self.seal_block(head_index)
 
         # pop values from loop stack post recursion
         loop_indices = self.loop_stack.pop()

@@ -6,13 +6,10 @@ import yaml
 from numba_rvsdg.core.datastructures.ast_transforms import AST2SCFGTransformer
 
 
-transformer = AST2SCFGTransformer()
-
-
 class TestAST2SCFGTransformer(TestCase):
 
     def compare(self, function, expected):
-        astcfg = transformer.transform_to_ASTCFG(function)
+        astcfg = AST2SCFGTransformer(function).transform_to_ASTCFG()
         self.assertEqual(astcfg.to_dict(), yaml.safe_load(expected))
 
     def test_solo_return(self):
