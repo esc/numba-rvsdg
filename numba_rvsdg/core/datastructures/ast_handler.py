@@ -333,8 +333,9 @@ class ASTHandler:
 
         # pop values from loop stack post recursion
         loop_indices = self.loop_stack.pop()
-        assert (loop_indices.head == head_index
-                and loop_indices.exit == exit_index)
+        assert (
+            loop_indices.head == head_index and loop_indices.exit == exit_index
+        )
 
         # Create exit block
         self.add_block(exit_index)
@@ -392,8 +393,9 @@ class ASTHandler:
 
         # pop values from loop stack post recursion
         loop_indices = self.loop_stack.pop()
-        assert (loop_indices.head == head_index
-                and loop_indices.exit == exit_index)
+        assert (
+            loop_indices.head == head_index and loop_indices.exit == exit_index
+        )
 
         # Create else block
         self.add_block(else_index)
