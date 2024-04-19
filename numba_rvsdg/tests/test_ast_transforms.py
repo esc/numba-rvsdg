@@ -12,7 +12,6 @@ class TestAST2SCFGTransformer(TestCase):
         self.assertEqual(astcfg.to_dict(), expected)
 
     def test_solo_return(self):
-
         def function() -> int:
             return 1
 
@@ -23,11 +22,9 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "0",
             }
         }
-
         self.compare(function, expected)
 
     def test_solo_assign(self):
-
         def function() -> None:
             x = 1  # noqa: F841
 
@@ -38,7 +35,6 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "0",
             }
         }
-
         self.compare(function, expected)
 
     def test_assign_return(self):
@@ -53,7 +49,6 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "0",
             }
         }
-
         self.compare(function, expected)
 
     def test_if_return(self):
@@ -79,7 +74,6 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "3",
             },
         }
-
         self.compare(function, expected)
 
     def test_if_else_return(self):
@@ -106,11 +100,9 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "2",
             },
         }
-
         self.compare(function, expected)
 
     def test_if_else_assign(self):
-
         def function(x: int) -> int:
             if x < 10:
                 z = 1
@@ -140,11 +132,9 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "3",
             },
         }
-
         self.compare(function, expected)
 
     def test_nested_if(self):
-
         def function(x: int, y: int) -> int:
             if x < 10:
                 if y < 5:
@@ -200,7 +190,6 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "8",
             },
         }
-
         self.compare(function, expected)
 
     def test_nested_if_with_empty_else_and_return(self):
@@ -256,11 +245,9 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "9",
             },
         }
-
         self.compare(function, expected)
 
     def test_elif(self):
-
         def function(x: int, a: int, b: int) -> int:
             if x < 10:
                 return
@@ -310,7 +297,6 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "8",
             },
         }
-
         self.compare(function, expected)
 
     def test_simple_loop(self):
@@ -342,7 +328,6 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "3",
             },
         }
-
         self.compare(function, expected)
 
     def test_nested_loop(self):
@@ -387,7 +372,6 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "5",
             },
         }
-
         self.compare(function, expected)
 
     def test_if_in_loop(self):
@@ -432,11 +416,9 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "5",
             },
         }
-
         self.compare(function, expected)
 
     def test_loop_in_if(self):
-
         def function(a: bool) -> int:
             x = 0
             if a is True:
@@ -479,7 +461,6 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "6",
             },
         }
-
         self.compare(function, expected)
 
     def test_loop_break_continue(self):
@@ -537,7 +518,6 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "8",
             },
         }
-
         self.compare(function, expected)
 
     def test_simple_for(self):
