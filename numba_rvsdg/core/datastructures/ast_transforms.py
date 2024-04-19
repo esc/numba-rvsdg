@@ -178,36 +178,26 @@ class AST2SCFGTransformer:
 
     """
 
-    def __init__(self, prune: bool = True) -> None:
+    def __init__(self, code: Callable[..., Any], prune: bool = True) -> None:
         # Prune empty and unreachable nodes from the CFG
-        self.prune = prune
-        # Monotonically increasing block index
+        self.prune: bool = prune
+        # Save the code for transformation
+        self.code: Callable[..., Any] = code
+        # Monotonically increasing block index, 0 is reserved for genesis
         self.block_index: int = 1
         # Dict mapping block indices as strings to WritableASTBlocks
         # (This is the datastructure to hold the CFG.)
         self.blocks: ASTCFG = ASTCFG()
-        # Current block being written to
-        self.current_block: WritableASTBlock = WritableASTBlock("0")
-        # Stack for header and exiting block of current loop
-        self.loop_stack: list[LoopIndices] = []
-
-    def reset(self) -> None:
-        """Reset the tranformer to initial state."""
-        # Block index starts at 1, 0 is reserved for the genesis block
-        self.block_index = 1
-        # Initialize blocks dict (CFG)
-        self.blocks = ASTCFG()
         # Initialize first (genesis) block, assume it's named zero
         # (This also initializes the self.current_block attribute.)
         self.add_block(0)
-        # Initialize loop stack
-        self.loop_stack = []
+        # Stack for header and exiting block of current loop
+        self.loop_stack: list[LoopIndices] = []
 
-    def transform(self, code: Callable[..., Any]) -> None:
+    def transform(self) -> None:
         """Handle Python function."""
-        self.reset()
         # Convert source code into AST
-        tree = ast.parse(textwrap.dedent(inspect.getsource(code))).body
+        tree = ast.parse(textwrap.dedent(inspect.getsource(self.code))).body
         # Assert that the code handed in was a function, we can only convert
         # functions.
         assert isinstance(tree[0], ast.FunctionDef)
@@ -217,14 +207,14 @@ class AST2SCFGTransformer:
             _ = self.blocks.prune_unreachable()
             _ = self.blocks.prune_empty()
 
-    def transform_to_ASTCFG(self, code: Callable[..., Any]) -> ASTCFG:
+    def transform_to_ASTCFG(self) -> ASTCFG:
         """Generate ASTCFG from Python function."""
-        self.handle(code)
+        self.transform()
         return self.blocks
 
-    def transform_to_SCFG(self, code: Callable[..., Any]) -> SCFG:
+    def transform_to_SCFG(self) -> SCFG:
         """Generate SCFG from Python function."""
-        self.handle(code)
+        self.transform()
         return self.blocks.to_SCFG()
 
     def codegen(self, tree: list[type[ast.AST]] | list[ast.stmt]) -> None:
@@ -369,8 +359,8 @@ class AST2SCFGTransformer:
         # Assign the components of the for-loop to variables
         target = ast.unparse(node.target)
         iter_setup = ast.unparse(node.iter)
-        iter_assign = "ITER"
-        last_target_value = "LAST"
+        iter_assign = "__iterator__"
+        last_target_value = "__iter_last__"
 
         # Emit iter setup to pre-header
         preheader_code = textwrap.dedent(
@@ -390,8 +380,8 @@ class AST2SCFGTransformer:
         header_code = textwrap.dedent(
             f"""
             {last_target_value} = {target}
-            {target} = next({iter_assign}, "SENTINEL")
-            {target} != "SENTINEL"
+            {target} = next({iter_assign}, "__sentinel__")
+            {target} != "__sentinel__"
         """
         )
         self.codegen(ast.parse(header_code).body)
@@ -441,8 +431,14 @@ class AST2SCFGTransformer:
         render_scfg(self.blocks.to_SCFG())
 
 
-def AST2SCFG(code: Callable[...]) -> SCFG:
+def AST2SCFG(code: Callable[..., Any]) -> SCFG:
+    return AST2SCFGTransformer(code).transform_to_SCFG()
+
+
+def SCFG2AST(scfg: SCFG) -> ast.FunctionDef:  # type: ignore
+    # TODO
     pass
+
 
 if __name__ == "__main__":
 
@@ -459,6 +455,5 @@ if __name__ == "__main__":
                 continue
         return i
 
-    h = 
-    s = h.generate_SCFG(function)
+    s = AST2SCFG(function)
     render_scfg(s)
