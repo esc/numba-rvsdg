@@ -122,7 +122,7 @@ class ASTCFG(dict[str, WritableASTBlock]):
         return SCFG(graph=self.convert_blocks())
 
     def prune_unreachable(self) -> set[WritableASTBlock]:
-        """Prune unreachable nodes from the CFG."""
+        """Prune unreachable blocks from the CFG."""
         # Assume that the entry block is named zero (0)
         to_visit, reachable, unreachable = set("0"), set(), set()
         # Visit all reachable blocks
@@ -140,15 +140,15 @@ class ASTCFG(dict[str, WritableASTBlock]):
         return unreachable
 
     def prune_empty(self) -> set[WritableASTBlock]:
-        """Prune empty nodes from the CFG."""
+        """Prune empty blocks from the CFG."""
         empty = set()
         for name, block in list(self.items()):
             if not block.instructions:
                 empty.add(self.pop(name))
-                # Empty nodes can only have a single jump target.
+                # Empty blocks can only have a single jump target.
                 it = block.jump_targets[0]
-                # iterate over the nodes looking for nodes that point to the
-                # removed node
+                # Iterate over the blocks looking for blocks that point to the
+                # removed block.
                 for b in list(self.values()):
                     if len(b.jump_targets) == 0:
                         continue
@@ -179,7 +179,7 @@ class AST2SCFGTransformer:
     """
 
     def __init__(self, code: Callable[..., Any], prune: bool = True) -> None:
-        # Prune empty and unreachable nodes from the CFG
+        # Prune empty and unreachable blocks from the CFG
         self.prune: bool = prune
         # Save the code for transformation
         self.code: Callable[..., Any] = code
