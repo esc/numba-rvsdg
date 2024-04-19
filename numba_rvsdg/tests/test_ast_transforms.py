@@ -3,7 +3,7 @@ from unittest import main, TestCase
 import textwrap
 import yaml
 
-from numba_rvsdg.core.datastructures.ast_handler import ASTHandler
+from numba_rvsdg.core.datastructures.ast_transforms import ASTHandler
 
 
 handler = ASTHandler()
