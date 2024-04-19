@@ -417,14 +417,18 @@ class ASTHandler:
 
 if __name__ == "__main__":
 
-    def function() -> int:
-        j = 0
-        for i in range(10):
-            if i % 2 == 0:
-                continue
+    def function(a: int, b: int) -> int:
+        for i in range(100):
+            i += 1
+            if i == a:
+                i = 666
+                return i
+            elif i == b:
+                i = 777
+                return i
             else:
-                j += 1
-        return j
+                continue
+        return i
 
     h = ASTHandler()
     s = h.generate_SCFG(function)
