@@ -452,21 +452,3 @@ def AST2SCFG(code: Callable[..., Any]) -> SCFG:
 def SCFG2AST(scfg: SCFG) -> ast.FunctionDef:  # type: ignore
     """Tranform SCFG with PythonASTBlocks into an AST FunctionDef."""
     # TODO
-
-
-if __name__ == "__main__":
-
-    def function(a: int, b: int) -> int:
-        for i in range(2):
-            if i == a:
-                i = 3
-                return i
-            elif i == b:
-                i = 4
-                break
-            else:
-                continue
-        return i
-
-    s = AST2SCFG(function)
-    render_scfg(s)
