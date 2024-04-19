@@ -106,7 +106,7 @@ class ASTCFG(dict[str, WriteableBasicBlock]):
         """Convert ASTCFG to SCFG"""
         return SCFG(graph=self.convert_blocks())
 
-    def prune_unreachable(self) -> None:
+    def prune_unreachable(self) -> set[WriteableBasicBlock]:
         """Prune unreachable nodes from the CFG."""
         to_visit, reachable, unreachable = set("0"), set(), set()
         # Visit all reachable blocks
@@ -123,7 +123,7 @@ class ASTCFG(dict[str, WriteableBasicBlock]):
                 unreachable.add(self.pop(block))
         return unreachable
 
-    def prune_empty(self) -> None:
+    def prune_empty(self) -> set[WriteableBasicBlock]:
         """Prune empty nodes from the CFG."""
         empty = set()
         for name, block in list(self.items()):
@@ -155,7 +155,7 @@ class ASTHandler:
 
     """
 
-    def __init__(self, prune=True) -> None:
+    def __init__(self, prune: bool = True) -> None:
         # Prune empty and unreachable nodes from the CFG
         self.prune = prune
         # Monotonically increasing block index
