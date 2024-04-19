@@ -2,6 +2,7 @@ import ast
 import inspect
 from typing import Callable
 import textwrap
+from dataclasses import dataclass
 
 from typing import Any, MutableMapping
 
@@ -148,6 +149,12 @@ class ASTCFG(dict[str, WriteableBasicBlock]):
         return empty
 
 
+@dataclass(frozen=True)
+class LoopIndices:
+    head: int
+    exit: int
+
+
 class ASTHandler:
     """ASTHandler class.
 
@@ -166,9 +173,8 @@ class ASTHandler:
         self.blocks: ASTCFG = ASTCFG()
         # Current block being written to
         self.current_block: WriteableBasicBlock = WriteableBasicBlock("0")
-        # Stacks for header and exiting block of current loop
-        self.loop_head_stack: list[int] = []
-        self.loop_exit_stack: list[int] = []
+        # Stack for header and exiting block of current loop
+        self.loop_stack: list[LoopIndices] = []
 
     def reset(self) -> None:
         """Reset the handler to initial state."""
@@ -179,8 +185,8 @@ class ASTHandler:
         # Initialize first (genesis) block, assume it's named zero
         # (This also initializes the self.current_block attribute.)
         self.add_block(0)
-        # Initialize loop stacks
-        self.loop_head_stack, self.loop_exit_stack = [], []
+        # Initialize loop stack
+        self.loop_stack = []
 
     def handle(self, code: Callable[..., Any]) -> None:
         """Handle Python function."""
@@ -252,8 +258,8 @@ class ASTHandler:
     def seal(self, default_index: int) -> None:
         """Seal the current block by setting the jump_targets."""
         self.current_block.seal(
-            self.loop_head_stack[-1] if self.loop_head_stack else -1,
-            self.loop_exit_stack[-1] if self.loop_exit_stack else -1,
+            self.loop_stack[-1].head if self.loop_stack else -1,
+            self.loop_stack[-1].exit if self.loop_stack else -1,
             default_index,
         )
 
@@ -317,9 +323,8 @@ class ASTHandler:
         # Create body block
         self.add_block(body_index)
 
-        # setup loop stacks for recursion
-        self.loop_head_stack.append(head_index)
-        self.loop_exit_stack.append(exit_index)
+        # setup loop stack for recursion
+        self.loop_stack.append(LoopIndices(head_index, exit_index))
 
         # Recurse into it
         self.codegen(node.body)
@@ -327,8 +332,9 @@ class ASTHandler:
         self.seal(head_index)
 
         # pop values from loop stack post recursion
-        self.loop_head_stack.pop()
-        self.loop_exit_stack.pop()
+        loop_indices = self.loop_stack.pop()
+        assert (loop_indices.head == head_index
+                and loop_indices.exit == exit_index)
 
         # Create exit block
         self.add_block(exit_index)
@@ -376,9 +382,8 @@ class ASTHandler:
         # Create body block
         self.add_block(body_index)
 
-        # setup loop stacks for recursion
-        self.loop_head_stack.append(head_index)
-        self.loop_exit_stack.append(exit_index)
+        # setup loop stack for recursion
+        self.loop_stack.append(LoopIndices(head_index, exit_index))
 
         # Recurse into it
         self.codegen(node.body)
@@ -386,8 +391,9 @@ class ASTHandler:
         self.seal(head_index)
 
         # pop values from loop stack post recursion
-        self.loop_head_stack.pop()
-        self.loop_exit_stack.pop()
+        loop_indices = self.loop_stack.pop()
+        assert (loop_indices.head == head_index
+                and loop_indices.exit == exit_index)
 
         # Create else block
         self.add_block(else_index)
