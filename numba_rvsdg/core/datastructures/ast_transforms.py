@@ -112,12 +112,6 @@ class ASTCFG(dict[str, WritableASTBlock]):
             for (k, v) in self.items()
         }
 
-    def to_yaml(self) -> str:
-        """Convert ASTCFG to yaml based string serialization."""
-        import yaml
-
-        return yaml.dump(self.to_dict())
-
     def to_SCFG(self) -> SCFG:
         """Convert ASTCFG to SCFG"""
         return SCFG(graph=self.convert_blocks())
