@@ -1,4 +1,5 @@
 # mypy: ignore-errors
+from typing import Callable, Any
 from unittest import main, TestCase
 
 from numba_rvsdg.core.datastructures.ast_transforms import AST2SCFGTransformer
@@ -6,10 +7,20 @@ from numba_rvsdg.core.datastructures.ast_transforms import AST2SCFGTransformer
 
 class TestAST2SCFGTransformer(TestCase):
 
-    def compare(self, function, expected):
+    def compare(
+        self,
+        function: Callable[..., Any],
+        expected: dict[str, dict[str, Any]],
+        unreachable: set[int] = set(),
+        empty: set[int] = set(),
+    ):
         transformer = AST2SCFGTransformer(function)
         astcfg = transformer.transform_to_ASTCFG()
         self.assertEqual(astcfg.to_dict(), expected)
+        self.assertEqual(
+            set(i.name for i in astcfg.unreachable), unreachable
+        )
+        self.assertEqual(set(i.name for i in astcfg.empty), empty)
 
     def test_solo_return(self):
         def function() -> int:
@@ -74,7 +85,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "3",
             },
         }
-        self.compare(function, expected)
+        self.compare(function, expected, empty={'2'})
 
     def test_if_else_return(self):
         def function(x: int) -> int:
@@ -100,7 +111,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "2",
             },
         }
-        self.compare(function, expected)
+        self.compare(function, expected, unreachable={'3'})
 
     def test_if_else_assign(self):
         def function(x: int) -> int:
@@ -190,7 +201,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "8",
             },
         }
-        self.compare(function, expected)
+        self.compare(function, expected, empty={'6', '9'})
 
     def test_nested_if_with_empty_else_and_return(self):
         def function(x: int, y: int) -> None:
@@ -245,7 +256,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "9",
             },
         }
-        self.compare(function, expected)
+        self.compare(function, expected, empty={'5', '6'})
 
     def test_elif(self):
         def function(x: int, a: int, b: int) -> int:
@@ -297,7 +308,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "8",
             },
         }
-        self.compare(function, expected)
+        self.compare(function, expected, empty={'9', '6'})
 
     def test_simple_loop(self):
         def function() -> int:
@@ -416,7 +427,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "5",
             },
         }
-        self.compare(function, expected)
+        self.compare(function, expected, empty={'6'})
 
     def test_loop_in_if(self):
         def function(a: bool) -> int:
@@ -461,7 +472,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "6",
             },
         }
-        self.compare(function, expected)
+        self.compare(function, expected, empty={'5', '7'})
 
     def test_loop_break_continue(self):
         def function() -> int:
@@ -518,7 +529,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "8",
             },
         }
-        self.compare(function, expected)
+        self.compare(function, expected, empty={'6', '9'})
 
     def test_simple_for(self):
         def function() -> int:
@@ -631,7 +642,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "7",
             },
         }
-        self.compare(function, expected)
+        self.compare(function, expected, empty={'8'})
 
     def test_for_with_return_break_and_continue(self):
         def function(a: int, b: int) -> int:
@@ -700,7 +711,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "9",
             },
         }
-        self.compare(function, expected)
+        self.compare(function, expected, unreachable={'7', '10'})
 
     def test_for_with_nested_else_return_break_and_continue(self):
         def function(a: int, b: int, c: int, d: int, e: int, f: int) -> int:
@@ -829,7 +840,8 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "9",
             },
         }
-        self.compare(function, expected)
+        empty = {'7', '10', '13', '15', '18', '21', '24'}
+        self.compare(function, expected, empty=empty)
 
 
 if __name__ == "__main__":
