@@ -11,7 +11,7 @@ from numba_rvsdg.core.datastructures.basic_block import PythonASTBlock
 from numba_rvsdg.rendering.rendering import render_scfg
 
 
-class WriteableBasicBlock:
+class WritableASTBlock:
     """A basic block that can be written to.
 
     The ast -> cfg algorithm requires a basic block that can be written to.
@@ -81,16 +81,16 @@ class WriteableBasicBlock:
 
     def __repr__(self) -> str:
         return (
-            f"WriteableBasicBlock({self.name}, "
+            f"WritableASTBlock({self.name}, "
             "{self.instructions}, {self.jump_targets})"
         )
 
 
-class ASTCFG(dict[str, WriteableBasicBlock]):
-    """A CFG consisting of WriteableBasicBlocks."""
+class ASTCFG(dict[str, WritableASTBlock]):
+    """A CFG consisting of WritableASTBlocks."""
 
     def convert_blocks(self) -> MutableMapping[str, Any]:
-        """Convert WriteableBasicBlocks to PythonASTBlocks."""
+        """Convert WritableASTBlocks to PythonASTBlocks."""
         return {
             v.name: PythonASTBlock(
                 v.name,
@@ -121,7 +121,7 @@ class ASTCFG(dict[str, WriteableBasicBlock]):
         """Convert ASTCFG to SCFG"""
         return SCFG(graph=self.convert_blocks())
 
-    def prune_unreachable(self) -> set[WriteableBasicBlock]:
+    def prune_unreachable(self) -> set[WritableASTBlock]:
         """Prune unreachable nodes from the CFG."""
         # Assume that the entry block is named zero (0)
         to_visit, reachable, unreachable = set("0"), set(), set()
@@ -139,7 +139,7 @@ class ASTCFG(dict[str, WriteableBasicBlock]):
                 unreachable.add(self.pop(block))
         return unreachable
 
-    def prune_empty(self) -> set[WriteableBasicBlock]:
+    def prune_empty(self) -> set[WritableASTBlock]:
         """Prune empty nodes from the CFG."""
         empty = set()
         for name, block in list(self.items()):
@@ -183,11 +183,11 @@ class ASTHandler:
         self.prune = prune
         # Monotonically increasing block index
         self.block_index: int = 1
-        # Dict mapping block indices as strings to WriteableBasicBlocks
+        # Dict mapping block indices as strings to WritableASTBlocks
         # (This is the datastructure to hold the CFG.)
         self.blocks: ASTCFG = ASTCFG()
         # Current block being written to
-        self.current_block: WriteableBasicBlock = WriteableBasicBlock("0")
+        self.current_block: WritableASTBlock = WritableASTBlock("0")
         # Stack for header and exiting block of current loop
         self.loop_stack: list[LoopIndices] = []
 
@@ -234,7 +234,7 @@ class ASTHandler:
 
     def add_block(self, index: int) -> None:
         """Create block, add to CFG and set as current_block."""
-        self.blocks[str(index)] = self.current_block = WriteableBasicBlock(
+        self.blocks[str(index)] = self.current_block = WritableASTBlock(
             name=str(index)
         )
 
