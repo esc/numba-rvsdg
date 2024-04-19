@@ -12,7 +12,7 @@ from numba_rvsdg.rendering.rendering import render_scfg
 
 
 class WritableASTBlock:
-    """A basic block that can be written to.
+    """A basic block containing Python AST that can be written to.
 
     The ast -> cfg algorithm requires a basic block that can be written to.
 
@@ -170,11 +170,11 @@ class LoopIndices:
     exit: int
 
 
-class AST2SCFGTranformer:
-    """ASTHandler class.
+class AST2SCFGTransformer:
+    """AST2SCFGTransformer
 
-    The ASTHandler class is responsible for converting code in the form of a
-    Python Abstract Syntax Tree (ast) into CFG/SCFG.
+    The AST2SCFGTransformer class is responsible for transforming code in the
+    form of a Python Abstract Syntax Tree (ast) into CFG/SCFG.
 
     """
 
@@ -192,7 +192,7 @@ class AST2SCFGTranformer:
         self.loop_stack: list[LoopIndices] = []
 
     def reset(self) -> None:
-        """Reset the handler to initial state."""
+        """Reset the tranformer to initial state."""
         # Block index starts at 1, 0 is reserved for the genesis block
         self.block_index = 1
         # Initialize blocks dict (CFG)
@@ -203,7 +203,7 @@ class AST2SCFGTranformer:
         # Initialize loop stack
         self.loop_stack = []
 
-    def handle(self, code: Callable[..., Any]) -> None:
+    def transform(self, code: Callable[..., Any]) -> None:
         """Handle Python function."""
         self.reset()
         # Convert source code into AST
@@ -217,12 +217,12 @@ class AST2SCFGTranformer:
             _ = self.blocks.prune_unreachable()
             _ = self.blocks.prune_empty()
 
-    def generate_ASTCFG(self, code: Callable[..., Any]) -> ASTCFG:
+    def transform_to_ASTCFG(self, code: Callable[..., Any]) -> ASTCFG:
         """Generate ASTCFG from Python function."""
         self.handle(code)
         return self.blocks
 
-    def generate_SCFG(self, code: Callable[..., Any]) -> SCFG:
+    def transform_to_SCFG(self, code: Callable[..., Any]) -> SCFG:
         """Generate SCFG from Python function."""
         self.handle(code)
         return self.blocks.to_SCFG()
@@ -239,7 +239,7 @@ class AST2SCFGTranformer:
         )
 
     def handle_ast_node(self, node: type[ast.AST] | ast.stmt) -> None:
-        """Dispatch an AST node to handler."""
+        """Dispatch an AST node to handle."""
         if isinstance(node, ast.FunctionDef):
             self.handle_function_def(node)
         elif isinstance(
@@ -432,7 +432,7 @@ class AST2SCFGTranformer:
         self.add_block(exit_index)
 
     def render(self) -> None:
-        """Render the CFG contained in this handler as a SCFG.
+        """Render the CFG contained in this transformer as a SCFG.
 
         Useful for debugging purposes, set a breakpoint and then render to view
         intermediary results.
@@ -440,6 +440,9 @@ class AST2SCFGTranformer:
         """
         render_scfg(self.blocks.to_SCFG())
 
+
+def AST2SCFG(code: Callable[...]) -> SCFG:
+    pass
 
 if __name__ == "__main__":
 
@@ -456,6 +459,6 @@ if __name__ == "__main__":
                 continue
         return i
 
-    h = ASTHandler()
+    h = 
     s = h.generate_SCFG(function)
     render_scfg(s)
