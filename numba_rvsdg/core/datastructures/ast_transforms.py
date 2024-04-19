@@ -234,7 +234,14 @@ class AST2SCFGTransformer:
             _ = self.blocks.prune_empty()
 
     def codegen(self, tree: list[type[ast.AST]] | list[ast.stmt]) -> None:
-        """Recursively Generate code from a list of AST nodes."""
+        """Recursively transform from a list of AST nodes.
+
+        The function is called 'codegen' as it generates an intermediary
+        representation (IR) from an abstract syntax tree (AST). The name was
+        chosen to honour the compiler writing tradition, where this type of
+        recursive function is commonly called 'codegen'.
+
+        """
         for node in tree:
             self.handle_ast_node(node)
 
@@ -356,11 +363,15 @@ class AST2SCFGTransformer:
         exit_index = self.block_index + 3
         self.block_index += 4
 
-        # Assign the components of the for-loop to variables
+        # Assign the components of the for-loop to variables. These variables
+        # are versioned using the index of the loop header so that scopes can
+        # be nested. While this is structly required for the 'iter_setup' it is
+        # technically optional for the 'last_target_value' we version it too so
+        # that the two can easily be matched when visually inspecting the CFG.
         target = ast.unparse(node.target)
         iter_setup = ast.unparse(node.iter)
-        iter_assign = "__iterator__"
-        last_target_value = "__iter_last__"
+        iter_assign = f"__iterator_{head_index}__"
+        last_target_value = f"__iter_last_{head_index}__"
 
         # Emit iter setup to pre-header
         preheader_code = textwrap.dedent(
@@ -376,7 +387,8 @@ class AST2SCFGTransformer:
         # And create new header block
         self.add_block(head_index)
 
-        # Emit header instructions
+        # Emit header instructions. The '__sentinel__' is an unversioned
+        # marker, so it need not be versioned.
         header_code = textwrap.dedent(
             f"""
             {last_target_value} = {target}
@@ -385,27 +397,27 @@ class AST2SCFGTransformer:
         """
         )
         self.codegen(ast.parse(header_code).body)
-        # Set the jump targets to be the body and the exiting latch
+        # Set the jump targets to be the body and the else block.
         self.current_block.set_jump_targets(body_index, else_index)
 
-        # Create body block
+        # Create body block.
         self.add_block(body_index)
 
-        # setup loop stack for recursion
+        # Setup loop stack for recursion.
         self.loop_stack.append(LoopIndices(head_index, exit_index))
 
-        # Recurse into it
+        # Recurse into it.
         self.codegen(node.body)
-        # After recursion, seal current block
+        # After recursion, seal current block.
         self.seal_block(head_index)
 
-        # pop values from loop stack post recursion
+        # Pop values from loop stack post recursion.
         loop_indices = self.loop_stack.pop()
         assert (
             loop_indices.head == head_index and loop_indices.exit == exit_index
         )
 
-        # Create else block
+        # Create else block.h
         self.add_block(else_index)
         self.current_block.set_jump_targets(exit_index)
 
@@ -419,7 +431,7 @@ class AST2SCFGTransformer:
         self.codegen(ast.parse(else_code).body)
         self.codegen(node.orelse)
 
-        # Create exit block
+        # Create exit block.
         self.add_block(exit_index)
 
     def render(self) -> None:

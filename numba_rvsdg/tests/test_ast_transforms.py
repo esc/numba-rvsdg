@@ -7,7 +7,8 @@ from numba_rvsdg.core.datastructures.ast_transforms import AST2SCFGTransformer
 class TestAST2SCFGTransformer(TestCase):
 
     def compare(self, function, expected):
-        astcfg = AST2SCFGTransformer(function).transform_to_ASTCFG()
+        transformer = AST2SCFGTransformer(function)
+        astcfg = transformer.transform_to_ASTCFG()
         self.assertEqual(astcfg.to_dict(), expected)
 
     def test_solo_return(self):
@@ -537,6 +538,188 @@ class TestAST2SCFGTransformer(TestCase):
             },
         }
 
+        self.compare(function, expected)
+
+    def test_simple_for(self):
+        def function() -> int:
+            c = 0
+            for i in range(10):
+                c += i
+            return c
+
+        expected = {
+            "0": {
+                "instructions": [
+                    "c = 0",
+                    "__iterator_1__ = iter(range(10))",
+                    "i = None",
+                ],
+                "jump_targets": ["1"],
+                "name": "0",
+            },
+            "1": {
+                "instructions": [
+                    "__iter_last_1__ = i",
+                    "i = next(__iterator_1__, '__sentinel__')",
+                    "i != '__sentinel__'",
+                ],
+                "jump_targets": ["2", "3"],
+                "name": "1",
+            },
+            "2": {
+                "instructions": ["c += i"],
+                "jump_targets": ["1"],
+                "name": "2",
+            },
+            "3": {
+                "instructions": ["i = __iter_last_1__"],
+                "jump_targets": ["4"],
+                "name": "3",
+            },
+            "4": {
+                "instructions": ["return c"],
+                "jump_targets": [],
+                "name": "4",
+            },
+        }
+        self.compare(function, expected)
+
+    def test_nested_for(self):
+        def function() -> int:
+            c = 0
+            for i in range(3):
+                c += i
+                for j in range(3):
+                    c += j
+            return c
+
+        expected = {
+            "0": {
+                "instructions": [
+                    "c = 0",
+                    "__iterator_1__ = iter(range(3))",
+                    "i = None",
+                ],
+                "jump_targets": ["1"],
+                "name": "0",
+            },
+            "1": {
+                "instructions": [
+                    "__iter_last_1__ = i",
+                    "i = next(__iterator_1__, '__sentinel__')",
+                    "i != '__sentinel__'",
+                ],
+                "jump_targets": ["2", "3"],
+                "name": "1",
+            },
+            "2": {
+                "instructions": [
+                    "c += i",
+                    "__iterator_5__ = iter(range(3))",
+                    "j = None",
+                ],
+                "jump_targets": ["5"],
+                "name": "2",
+            },
+            "3": {
+                "instructions": ["i = __iter_last_1__"],
+                "jump_targets": ["4"],
+                "name": "3",
+            },
+            "4": {
+                "instructions": ["return c"],
+                "jump_targets": [],
+                "name": "4",
+            },
+            "5": {
+                "instructions": [
+                    "__iter_last_5__ = j",
+                    "j = next(__iterator_5__, '__sentinel__')",
+                    "j != '__sentinel__'",
+                ],
+                "jump_targets": ["6", "7"],
+                "name": "5",
+            },
+            "6": {
+                "instructions": ["c += j"],
+                "jump_targets": ["5"],
+                "name": "6",
+            },
+            "7": {
+                "instructions": ["j = __iter_last_5__"],
+                "jump_targets": ["1"],
+                "name": "7",
+            },
+        }
+        self.compare(function, expected)
+
+    def test_for_with_return_break_and_continue(self):
+        def function(a: int, b: int) -> int:
+            for i in range(2):
+                if i == a:
+                    i = 3
+                    return i
+                elif i == b:
+                    i = 4
+                    break
+                else:
+                    continue
+            return i
+
+        expected = {
+            "0": {
+                "instructions": [
+                    "__iterator_1__ = iter(range(2))",
+                    "i = None",
+                ],
+                "jump_targets": ["1"],
+                "name": "0",
+            },
+            "1": {
+                "instructions": [
+                    "__iter_last_1__ = i",
+                    "i = next(__iterator_1__, '__sentinel__')",
+                    "i != '__sentinel__'",
+                ],
+                "jump_targets": ["2", "3"],
+                "name": "1",
+            },
+            "2": {
+                "instructions": ["i == a"],
+                "jump_targets": ["5", "6"],
+                "name": "2",
+            },
+            "3": {
+                "instructions": ["i = __iter_last_1__"],
+                "jump_targets": ["4"],
+                "name": "3",
+            },
+            "4": {
+                "instructions": ["return i"],
+                "jump_targets": [],
+                "name": "4",
+            },
+            "5": {
+                "instructions": ["i = 3", "return i"],
+                "jump_targets": [],
+                "name": "5",
+            },
+            "6": {
+                "instructions": ["i == b"],
+                "jump_targets": ["8", "9"],
+                "name": "6",
+            },
+            "8": {
+                "instructions": ["i = 4", "break"],
+                "jump_targets": ["4"],
+                "name": "8",
+            },
+            "9": {
+                "instructions": ["continue"],
+                "jump_targets": ["1"],
+                "name": "9",
+            },
+        }
         self.compare(function, expected)
 
 
