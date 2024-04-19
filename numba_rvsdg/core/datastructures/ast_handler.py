@@ -109,7 +109,9 @@ class ASTHandler:
 
     """
 
-    def __init__(self) -> None:
+    def __init__(self, prune=True) -> None:
+        # Prune empty and unreachable nodes from the CFG
+        self.prune = prune
         # Monotonically increasing block index
         self.block_index: int = 1
         # Dict mapping block indices as strings to WriteableBasicBlocks
@@ -143,6 +145,9 @@ class ASTHandler:
         assert isinstance(tree[0], ast.FunctionDef)
         # Run recrisive code generation
         self.codegen(tree)
+        if self.prune:
+            self.prune_unreachable()
+            self.prune_empty()
 
     def generate_ASTCFG(self, code: Callable[..., Any]) -> ASTCFG:
         """Generate ASTCFG from Python function."""
@@ -353,10 +358,29 @@ class ASTHandler:
         # Create exit block
         self.add_block(exit_index)
 
+    def prune_unreachable(self) -> None:
+        """Prune unreachable nodes from the CFG."""
+        to_visit, reachable, unreachable = set("0"), set(), set()
+        # Visit all reachable blocks
+        while to_visit:
+            block = to_visit.pop()
+            if block not in reachable:
+                # Add block to reachable set
+                reachable.add(block)
+                # Update to_visit with jump targets of the block
+                to_visit.update(self.blocks[block].jump_targets)
+        # Remove unreachable blocks
+        for block in list(self.blocks.keys()):
+            if block not in reachable:
+                unreachable.add(self.blocks.pop(block))
+        return unreachable
+
     def prune_empty(self) -> None:
+        """Prune empty nodes from the CFG."""
+        empty = set()
         for i in list(self.blocks.values()):
             if not i.instructions:
-                self.blocks.pop(i.name)
+                empty.add(self.blocks.pop(i.name))
                 # Empty nodes can only have a single jump target.
                 it = i.jump_targets[0]
                 # iterate over the nodes looking for nodes that point to the
@@ -372,6 +396,7 @@ class ASTHandler:
                             j.jump_targets[0] = it
                         elif j.jump_targets[1] == i.name:
                             j.jump_targets[1] = it
+        return empty
 
     def render(self) -> None:
         """Render the CFG contained in this handler as a SCFG.
