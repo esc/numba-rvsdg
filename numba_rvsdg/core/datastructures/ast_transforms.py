@@ -169,6 +169,7 @@ class ASTCFG(dict[str, WritableASTBlock]):
 @dataclass(frozen=True)
 class LoopIndices:
     """Structure to hold the head and exit block indices of a loop."""
+
     head: int
     exit: int
 
@@ -438,14 +439,13 @@ class AST2SCFGTransformer:
 
 
 def AST2SCFG(code: Callable[..., Any]) -> SCFG:
-    """ Tranform Python function into an SCFG. """
+    """Tranform Python function into an SCFG."""
     return AST2SCFGTransformer(code).transform_to_SCFG()
 
 
 def SCFG2AST(scfg: SCFG) -> ast.FunctionDef:  # type: ignore
-    """ Tranform SCFG with PythonASTBlocks into an AST FunctionDef. """
+    """Tranform SCFG with PythonASTBlocks into an AST FunctionDef."""
     # TODO
-    pass
 
 
 if __name__ == "__main__":

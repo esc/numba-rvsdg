@@ -10,35 +10,40 @@ class TestAST2SCFGTransformer(TestCase):
 
     def compare(self, function, expected):
         astcfg = AST2SCFGTransformer(function).transform_to_ASTCFG()
-        self.assertEqual(astcfg.to_dict(), yaml.safe_load(expected))
+        if isinstance(expected, dict):
+            self.assertEqual(astcfg.to_dict(), expected)
+        else:
+            self.assertEqual(astcfg.to_dict(), yaml.safe_load(expected))
+            # breakpoint()
 
     def test_solo_return(self):
+
         def function() -> int:
             return 1
 
-        expected = textwrap.dedent(
-            """
-            '0':
-              instructions:
-              - return 1
-              jump_targets: []
-              name: '0'"""
-        )
+        expected = {
+            "0": {
+                "instructions": ["return 1"],
+                "jump_targets": [],
+                "name": "0",
+            }
+        }
+
         self.compare(function, expected)
 
     def test_solo_assign(self):
+
         def function() -> None:
             x = 1  # noqa: F841
 
-        expected = textwrap.dedent(
-            """
-            '0':
-              instructions:
-              - x = 1
-              - return
-              jump_targets: []
-              name: '0'"""
-        )
+        expected = {
+            "0": {
+                "instructions": ["x = 1", "return"],
+                "jump_targets": [],
+                "name": "0",
+            }
+        }
+
         self.compare(function, expected)
 
     def test_assign_return(self):
@@ -46,15 +51,14 @@ class TestAST2SCFGTransformer(TestCase):
             x = 1
             return x
 
-        expected = textwrap.dedent(
-            """
-            '0':
-              instructions:
-              - x = 1
-              - return x
-              jump_targets: []
-              name: '0'"""
-        )
+        expected = {
+            "0": {
+                "instructions": ["x = 1", "return x"],
+                "jump_targets": [],
+                "name": "0",
+            }
+        }
+
         self.compare(function, expected)
 
     def test_if_return(self):
@@ -309,59 +313,45 @@ class TestAST2SCFGTransformer(TestCase):
                 y = a - b
             return y
 
-        expected = textwrap.dedent(
-            """
-            '0':
-              instructions:
-              - x < 10
-              jump_targets:
-              - '1'
-              - '2'
-              name: '0'
-            '1':
-              instructions:
-              - return
-              jump_targets: []
-              name: '1'
-            '2':
-              instructions:
-              - x < 15
-              jump_targets:
-              - '4'
-              - '5'
-              name: '2'
-            '3':
-              instructions:
-              - return y
-              jump_targets: []
-              name: '3'
-            '4':
-              instructions:
-              - y = b - a
-              jump_targets:
-              - '3'
-              name: '4'
-            '5':
-              instructions:
-              - x < 20
-              jump_targets:
-              - '7'
-              - '8'
-              name: '5'
-            '7':
-              instructions:
-              - y = a ** 2
-              jump_targets:
-              - '3'
-              name: '7'
-            '8':
-              instructions:
-              - y = a - b
-              jump_targets:
-              - '3'
-              name: '8'
-            """
-        )
+        expected = {
+            "0": {
+                "instructions": ["x < 10"],
+                "jump_targets": ["1", "2"],
+                "name": "0",
+            },
+            "1": {"instructions": ["return"], "jump_targets": [], "name": "1"},
+            "2": {
+                "instructions": ["x < 15"],
+                "jump_targets": ["4", "5"],
+                "name": "2",
+            },
+            "3": {
+                "instructions": ["return y"],
+                "jump_targets": [],
+                "name": "3",
+            },
+            "4": {
+                "instructions": ["y = b - a"],
+                "jump_targets": ["3"],
+                "name": "4",
+            },
+            "5": {
+                "instructions": ["x < 20"],
+                "jump_targets": ["7", "8"],
+                "name": "5",
+            },
+            "7": {
+                "instructions": ["y = a ** 2"],
+                "jump_targets": ["3"],
+                "name": "7",
+            },
+            "8": {
+                "instructions": ["y = a - b"],
+                "jump_targets": ["3"],
+                "name": "8",
+            },
+        }
+
         self.compare(function, expected)
 
     def test_simple_loop(self):
