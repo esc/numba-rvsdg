@@ -106,6 +106,46 @@ class ASTCFG(dict[str, WriteableBasicBlock]):
         """Convert ASTCFG to SCFG"""
         return SCFG(graph=self.convert_blocks())
 
+    def prune_unreachable(self) -> None:
+        """Prune unreachable nodes from the CFG."""
+        to_visit, reachable, unreachable = set("0"), set(), set()
+        # Visit all reachable blocks
+        while to_visit:
+            block = to_visit.pop()
+            if block not in reachable:
+                # Add block to reachable set
+                reachable.add(block)
+                # Update to_visit with jump targets of the block
+                to_visit.update(self[block].jump_targets)
+        # Remove unreachable blocks
+        for block in list(self.keys()):
+            if block not in reachable:
+                unreachable.add(self.pop(block))
+        return unreachable
+
+    def prune_empty(self) -> None:
+        """Prune empty nodes from the CFG."""
+        empty = set()
+        for name, block in list(self.items()):
+            if not block.instructions:
+                empty.add(self.pop(name))
+                # Empty nodes can only have a single jump target.
+                it = block.jump_targets[0]
+                # iterate over the nodes looking for nodes that point to the
+                # removed node
+                for j in list(self.blocks.values()):
+                    if len(j.jump_targets) == 0:
+                        continue
+                    elif len(j.jump_targets) == 1:
+                        if j.jump_targets[0] == name:
+                            j.jump_targets[0] = it
+                    elif len(j.jump_targets) == 2:
+                        if j.jump_targets[0] == name:
+                            j.jump_targets[0] = it
+                        elif j.jump_targets[1] == name:
+                            j.jump_targets[1] = it
+        return empty
+
 
 class ASTHandler:
     """ASTHandler class.
@@ -152,8 +192,8 @@ class ASTHandler:
         # Run recrisive code generation
         self.codegen(tree)
         if self.prune:
-            self.prune_unreachable()
-            self.prune_empty()
+            _ = self.blocks.prune_unreachable()
+            _ = self.blocks.prune_empty()
 
     def generate_ASTCFG(self, code: Callable[..., Any]) -> ASTCFG:
         """Generate ASTCFG from Python function."""
@@ -364,45 +404,6 @@ class ASTHandler:
         # Create exit block
         self.add_block(exit_index)
 
-    def prune_unreachable(self) -> None:
-        """Prune unreachable nodes from the CFG."""
-        to_visit, reachable, unreachable = set("0"), set(), set()
-        # Visit all reachable blocks
-        while to_visit:
-            block = to_visit.pop()
-            if block not in reachable:
-                # Add block to reachable set
-                reachable.add(block)
-                # Update to_visit with jump targets of the block
-                to_visit.update(self.blocks[block].jump_targets)
-        # Remove unreachable blocks
-        for block in list(self.blocks.keys()):
-            if block not in reachable:
-                unreachable.add(self.blocks.pop(block))
-        return unreachable
-
-    def prune_empty(self) -> None:
-        """Prune empty nodes from the CFG."""
-        empty = set()
-        for i in list(self.blocks.values()):
-            if not i.instructions:
-                empty.add(self.blocks.pop(i.name))
-                # Empty nodes can only have a single jump target.
-                it = i.jump_targets[0]
-                # iterate over the nodes looking for nodes that point to the
-                # removed node
-                for j in list(self.blocks.values()):
-                    if len(j.jump_targets) == 0:
-                        continue
-                    elif len(j.jump_targets) == 1:
-                        if j.jump_targets[0] == i.name:
-                            j.jump_targets[0] = it
-                    elif len(j.jump_targets) == 2:
-                        if j.jump_targets[0] == i.name:
-                            j.jump_targets[0] = it
-                        elif j.jump_targets[1] == i.name:
-                            j.jump_targets[1] = it
-        return empty
 
     def render(self) -> None:
         """Render the CFG contained in this handler as a SCFG.
