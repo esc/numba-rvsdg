@@ -73,18 +73,13 @@ class TestASTConversion(TestCase):
               - x < 10
               jump_targets:
               - '1'
-              - '2'
+              - '3'
               name: '0'
             '1':
               instructions:
               - return 1
               jump_targets: []
               name: '1'
-            '2':
-              instructions: []
-              jump_targets:
-              - '3'
-              name: '2'
             '3':
               instructions:
               - return 2
@@ -120,11 +115,6 @@ class TestASTConversion(TestCase):
               - return 2
               jump_targets: []
               name: '2'
-            '3':
-              instructions:
-              - return
-              jump_targets: []
-              name: '3'
               """
         )
         self.compare(function, expected)
@@ -213,36 +203,26 @@ class TestASTConversion(TestCase):
               instructions:
               - y = 1
               jump_targets:
-              - '6'
+              - '3'
               name: '4'
             '5':
               instructions:
               - y = 2
               jump_targets:
-              - '6'
-              name: '5'
-            '6':
-              instructions: []
-              jump_targets:
               - '3'
-              name: '6'
+              name: '5'
             '7':
               instructions:
               - y = 3
               jump_targets:
-              - '9'
+              - '3'
               name: '7'
             '8':
               instructions:
               - y = 4
               jump_targets:
-              - '9'
-              name: '8'
-            '9':
-              instructions: []
-              jump_targets:
               - '3'
-              name: '9'
+              name: '8'
               """
         )
         self.compare(function, expected)
@@ -278,7 +258,7 @@ class TestASTConversion(TestCase):
               - y < 5
               jump_targets:
               - '4'
-              - '5'
+              - '3'
               name: '1'
             '2':
               instructions:
@@ -296,18 +276,8 @@ class TestASTConversion(TestCase):
               instructions:
               - y = 1
               jump_targets:
-              - '6'
-              name: '4'
-            '5':
-              instructions: []
-              jump_targets:
-              - '6'
-              name: '5'
-            '6':
-              instructions: []
-              jump_targets:
               - '3'
-              name: '6'
+              name: '4'
             '7':
               instructions:
               - y = 2
@@ -372,7 +342,7 @@ class TestASTConversion(TestCase):
               instructions:
               - y = b - a
               jump_targets:
-              - '6'
+              - '3'
               name: '4'
             '5':
               instructions:
@@ -381,28 +351,18 @@ class TestASTConversion(TestCase):
               - '7'
               - '8'
               name: '5'
-            '6':
-              instructions: []
-              jump_targets:
-              - '3'
-              name: '6'
             '7':
               instructions:
               - y = a ** 2
               jump_targets:
-              - '9'
+              - '3'
               name: '7'
             '8':
               instructions:
               - y = a - b
               jump_targets:
-              - '9'
+              - '3'
               name: '8'
-            '9':
-              instructions: []
-              jump_targets:
-              - '6'
-              name: '9'
             """
         )
         self.compare(function, expected)
@@ -539,19 +499,14 @@ class TestASTConversion(TestCase):
               instructions:
               - x += 2
               jump_targets:
-              - '6'
+              - '1'
               name: '4'
             '5':
               instructions:
               - x += 1
               jump_targets:
-              - '6'
-              name: '5'
-            '6':
-              instructions: []
-              jump_targets:
               - '1'
-              name: '6'
+              name: '5'
             """
         )
         self.compare(function, expected)
@@ -582,14 +537,14 @@ class TestASTConversion(TestCase):
               - x < 10
               jump_targets:
               - '4'
-              - '5'
+              - '3'
               name: '1'
             '2':
               instructions:
               - x < 10
               jump_targets:
               - '6'
-              - '7'
+              - '3'
               name: '2'
             '3':
               instructions:
@@ -602,22 +557,12 @@ class TestASTConversion(TestCase):
               jump_targets:
               - '1'
               name: '4'
-            '5':
-              instructions: []
-              jump_targets:
-              - '3'
-              name: '5'
             '6':
               instructions:
               - x += 1
               jump_targets:
               - '2'
               name: '6'
-            '7':
-              instructions: []
-              jump_targets:
-              - '3'
-              name: '7'
             """
         )
         self.compare(function, expected)
@@ -676,11 +621,6 @@ class TestASTConversion(TestCase):
               - '7'
               - '8'
               name: '5'
-            '6':
-              instructions: []
-              jump_targets:
-              - '1'
-              name: '6'
             '7':
               instructions:
               - break
@@ -691,13 +631,8 @@ class TestASTConversion(TestCase):
               instructions:
               - x += 1
               jump_targets:
-              - '9'
+              - '1'
               name: '8'
-            '9':
-              instructions: []
-              jump_targets:
-              - '6'
-              name: '9'
             """
         )
         self.compare(function, expected)
