@@ -285,22 +285,24 @@ class ASTHandler:
         # Preallocate indices for blocks
         head_index = self.block_index
         body_index = self.block_index + 1
-        exit_index = self.block_index + 2
-        self.block_index += 3
+        else_index = self.block_index + 2
+        exit_index = self.block_index + 3
+        self.block_index += 4
 
         # Assign the components of the for-loop to variables
         target = ast.unparse(node.target)
         iter_setup = ast.unparse(node.iter)
         iter_assign = "ITER"
+        last_target_value = "LAST"
 
         # Emit iter setup to pre-header
         preheader_code = textwrap.dedent(
             f"""
             {iter_assign} = iter({iter_setup})
+            {target} = None
         """
         )
-        for i in ast.parse(preheader_code).body:
-            self.current_block.instructions.append(i)
+        self.codegen(ast.parse(preheader_code).body)
 
         # Point whatever the current block to header block
         self.current_block.set_jump_targets(head_index)
@@ -310,14 +312,14 @@ class ASTHandler:
         # Emit header instructions
         header_code = textwrap.dedent(
             f"""
+            {last_target_value} = {target}
             {target} = next({iter_assign}, "SENTINEL")
             {target} != "SENTINEL"
         """
         )
-        for i in ast.parse(header_code).body:
-            self.current_block.instructions.append(i)
+        self.codegen(ast.parse(header_code).body)
         # Set the jump targets to be the body and the exiting latch
-        self.current_block.set_jump_targets(body_index, exit_index)
+        self.current_block.set_jump_targets(body_index, else_index)
 
         # Create body block
         self.add_block(body_index)
@@ -334,6 +336,19 @@ class ASTHandler:
         # pop values from loop stack post recursion
         self.loop_head_stack.pop()
         self.loop_exit_stack.pop()
+
+        # Create else block
+        self.add_block(else_index)
+        self.current_block.set_jump_targets(exit_index)
+
+        # Emit orelse instructions
+        else_code = textwrap.dedent(
+            f"""
+            {target} = {last_target_value}
+        """
+        )
+        self.codegen(ast.parse(else_code).body)
+        self.codegen(node.orelse)
 
         # Create exit block
         self.add_block(exit_index)
