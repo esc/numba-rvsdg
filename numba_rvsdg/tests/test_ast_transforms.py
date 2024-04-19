@@ -722,6 +722,135 @@ class TestAST2SCFGTransformer(TestCase):
         }
         self.compare(function, expected)
 
+    def test_for_with_nested_else_return_break_and_continue(self):
+        def function(a: int, b: int, c: int, d: int, e: int, f: int) -> int:
+            for i in range(2):
+                if i == a:
+                    i = 3
+                    return i
+                elif i == b:
+                    i = 4
+                    break
+                elif i == c:
+                    i = 5
+                    continue
+                else:
+                    while i < 10:
+                        i += 1
+                        if i == d:
+                            i = 3
+                            return i
+                        elif i == e:
+                            i = 4
+                            break
+                        elif i == f:
+                            i = 5
+                            continue
+                        else:
+                            i += 1
+            return i
+
+        expected = {
+            "0": {
+                "instructions": [
+                    "__iterator_1__ = iter(range(2))",
+                    "i = None",
+                ],
+                "jump_targets": ["1"],
+                "name": "0",
+            },
+            "1": {
+                "instructions": [
+                    "__iter_last_1__ = i",
+                    "i = next(__iterator_1__, '__sentinel__')",
+                    "i != '__sentinel__'",
+                ],
+                "jump_targets": ["2", "3"],
+                "name": "1",
+            },
+            "11": {
+                "instructions": ["i = 5", "continue"],
+                "jump_targets": ["1"],
+                "name": "11",
+            },
+            "12": {
+                "instructions": ["i < 10"],
+                "jump_targets": ["14", "1"],
+                "name": "12",
+            },
+            "14": {
+                "instructions": ["i += 1", "i == d"],
+                "jump_targets": ["16", "17"],
+                "name": "14",
+            },
+            "16": {
+                "instructions": ["i = 3", "return i"],
+                "jump_targets": [],
+                "name": "16",
+            },
+            "17": {
+                "instructions": ["i == e"],
+                "jump_targets": ["19", "20"],
+                "name": "17",
+            },
+            "19": {
+                "instructions": ["i = 4", "break"],
+                "jump_targets": ["1"],
+                "name": "19",
+            },
+            "2": {
+                "instructions": ["i == a"],
+                "jump_targets": ["5", "6"],
+                "name": "2",
+            },
+            "20": {
+                "instructions": ["i == f"],
+                "jump_targets": ["22", "23"],
+                "name": "20",
+            },
+            "22": {
+                "instructions": ["i = 5", "continue"],
+                "jump_targets": ["12"],
+                "name": "22",
+            },
+            "23": {
+                "instructions": ["i += 1"],
+                "jump_targets": ["12"],
+                "name": "23",
+            },
+            "3": {
+                "instructions": ["i = __iter_last_1__"],
+                "jump_targets": ["4"],
+                "name": "3",
+            },
+            "4": {
+                "instructions": ["return i"],
+                "jump_targets": [],
+                "name": "4",
+            },
+            "5": {
+                "instructions": ["i = 3", "return i"],
+                "jump_targets": [],
+                "name": "5",
+            },
+            "6": {
+                "instructions": ["i == b"],
+                "jump_targets": ["8", "9"],
+                "name": "6",
+            },
+            "8": {
+                "instructions": ["i = 4", "break"],
+                "jump_targets": ["4"],
+                "name": "8",
+            },
+            "9": {
+                "instructions": ["i == c"],
+                "jump_targets": ["11", "12"],
+                "name": "9",
+            },
+        }
+        self.compare(function, expected)
+
 
 if __name__ == "__main__":
     main()
