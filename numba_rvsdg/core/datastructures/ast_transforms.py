@@ -102,7 +102,7 @@ class ASTCFG(dict[str, WritableASTBlock]):
         }
 
     def to_dict(self) -> dict[str, dict[str, object]]:
-        """Convert ASTCFG to simple dict based datastructure."""
+        """Convert ASTCFG to simple dict based data structure."""
         return {
             k: {
                 "name": v.name,
@@ -118,17 +118,17 @@ class ASTCFG(dict[str, WritableASTBlock]):
 
     def prune_unreachable(self) -> set[WritableASTBlock]:
         """Prune unreachable blocks from the CFG."""
-        # Assume that the entry block is named zero (0)
+        # Assume that the entry block is named zero (0).
         to_visit, reachable, unreachable = set("0"), set(), set()
-        # Visit all reachable blocks
+        # Visit all reachable blocks.
         while to_visit:
             block = to_visit.pop()
             if block not in reachable:
-                # Add block to reachable set
+                # Add block to reachable set.
                 reachable.add(block)
-                # Update to_visit with jump targets of the block
+                # Update to_visit with jump targets of the block.
                 to_visit.update(self[block].jump_targets)
-        # Remove unreachable blocks
+        # Remove unreachable blocks.
         for block in list(self.keys()):
             if block not in reachable:
                 unreachable.add(self.pop(block))
@@ -177,19 +177,19 @@ class AST2SCFGTransformer:
     """
 
     def __init__(self, code: Callable[..., Any], prune: bool = True) -> None:
-        # Prune empty and unreachable blocks from the CFG
+        # Prune empty and unreachable blocks from the CFG.
         self.prune: bool = prune
-        # Save the code for transformation
+        # Save the code for transformation.
         self.code: Callable[..., Any] = code
-        # Monotonically increasing block index, 0 is reserved for genesis
+        # Monotonically increasing block index, 0 is reserved for genesis.
         self.block_index: int = 1
-        # Dict mapping block indices as strings to WritableASTBlocks
-        # (This is the datastructure to hold the CFG.)
+        # Dict mapping block indices as strings to WritableASTBlocks.
+        # (This is the data structure to hold the CFG.)
         self.blocks: ASTCFG = ASTCFG()
-        # Initialize first (genesis) block, assume it's named zero
+        # Initialize first (genesis) block, assume it's named zero.
         # (This also initializes the self.current_block attribute.)
         self.add_block(0)
-        # Stack for header and exiting block of current loop
+        # Stack for header and exiting block of current loop.
         self.loop_stack: list[LoopIndices] = []
 
     def transform_to_ASTCFG(self) -> ASTCFG:
@@ -221,14 +221,14 @@ class AST2SCFGTransformer:
 
     def transform(self) -> None:
         """Transform Python function stored as self.code."""
-        # Convert source code into AST
+        # Convert source code into AST.
         tree = ast.parse(textwrap.dedent(inspect.getsource(self.code))).body
         # Assert that the code handed in was a function, we can only convert
         # functions.
         assert isinstance(tree[0], ast.FunctionDef)
-        # Run recrisive code generation
+        # Run recursive code generation.
         self.codegen(tree)
-        # Prune if needed
+        # Prune if requested.
         if self.prune:
             _ = self.blocks.prune_unreachable()
             _ = self.blocks.prune_empty()
@@ -272,47 +272,51 @@ class AST2SCFGTransformer:
 
     def handle_function_def(self, node: ast.FunctionDef) -> None:
         """Handle a function definition."""
-        # Insert implicit return None, if the function isn't terminated
+        # Insert implicit return None, if the function isn't terminated. May
+        # end up being an unreachable block if all other paths through the
+        # program already call return.
         if not isinstance(node.body[-1], ast.Return):
             node.body.append(ast.Return(None))
         self.codegen(node.body)
 
     def handle_if(self, node: ast.If) -> None:
         """Handle if statement."""
-        # Preallocate block indices for then, else, and end-if
+        # Preallocate block indices for then, else, and end-if.
         then_index = self.block_index
         else_index = self.block_index + 1
         enif_index = self.block_index + 2
         self.block_index += 3
 
-        # Emit comparison value to current block
+        # Emit comparison value to current/header block.
         self.current_block.instructions.append(node.test)
-        # Setup jump targets for current block
+        # Setup jump targets for current/header block.
         self.current_block.set_jump_targets(then_index, else_index)
 
-        # Create a new block for the then branch
+        # Create a new block for the then branch.
         self.add_block(then_index)
-        # Recursively process then branch
+        # Recursively transform then branch (this may alter the current_block).
         self.codegen(node.body)
-        # After recursion, current_block may need a jump target
+        # After recursion, current_block may need a jump target.
         self.seal_block(enif_index)
 
-        # Create a new block for the else branch
+        # Create a new block for the else branch.
         self.add_block(else_index)
-        # Recursively process else branch
+        # Recursively transform then branch (this may alter the current_block).
         self.codegen(node.orelse)
-        # After recursion, current_block may need a jump target
+        # After recursion, current_block may need a jump target.
         self.seal_block(enif_index)
 
-        # Create a new block for the end-if statements, if any
+        # Create a new block and leave 'open' for the end-if statements, if any.
         self.add_block(enif_index)
 
     def handle_while(self, node: ast.While) -> None:
         """Handle while statement."""
         # If the current block already has instructions, we need a new block as
-        # header. Otherwise just re-use the current-block.
+        # header. Otherwise just re-use the current_block. This happens
+        # when the previous statement was an if-statement with an empty
+        # endif_block, for example.
         if self.current_block.instructions:
-            # Preallocate header, body and exiting indices
+            # Preallocate header, body and exiting indices.
             head_index = self.block_index
             body_index = self.block_index + 1
             exit_index = self.block_index + 2
@@ -322,41 +326,170 @@ class AST2SCFGTransformer:
             self.current_block.set_jump_targets(head_index)
             # And create new header block
             self.add_block(head_index)
-        else:
-            # body and exiting indices
+        else: # reuse existing current_block
+            # Preallocate body and exiting indices.
             head_index = int(self.current_block.name)
             body_index = self.block_index
             exit_index = self.block_index + 1
             self.block_index += 2
 
-        # Emit comparison expression into header
+        # Emit comparison expression into header.
         self.current_block.instructions.append(node.test)
-        # Set the jump targets to be the body and the exiting latch
+        # Set the jump targets to be the body and the exiting latch.
         self.current_block.set_jump_targets(body_index, exit_index)
 
-        # Create body block
+        # Create body block.
         self.add_block(body_index)
 
-        # setup loop stack for recursion
+        # Push to loop stack for recursion.
         self.loop_stack.append(LoopIndices(head_index, exit_index))
 
-        # Recurse into it
+        # Recurs into the body of the while statement. (This may modify
+        # current_block).
         self.codegen(node.body)
-        # After recursion, seal current block
+        # After recursion, seal current_block. This sets the jump targets based
+        # on the last instruction in the current_block.
         self.seal_block(head_index)
 
-        # pop values from loop stack post recursion
+        # Pop values from loop stack post recursion.
         loop_indices = self.loop_stack.pop()
         assert (
             loop_indices.head == head_index and loop_indices.exit == exit_index
         )
 
-        # Create exit block
+        # Create exit block and leave 'open'.
         self.add_block(exit_index)
 
     def handle_for(self, node: ast.For) -> None:
-        """Handle for statement."""
-        # Preallocate indices for blocks
+        """Handle for statement.
+
+        The Python 'for' statement needs to be decomposed into a series of
+        equivalent Python statements, since the semantics of the statement can
+        not be represented in the control flow graph (CFG) formalism of blocks
+        with directed edges. We note that the for-loop in Python is effectively
+        syntactic sugar for a generalised c-style while-loop. This while-loop
+        can now be represented using the blocks and directed edges of the CFG
+        formalism. This docstring explains the decomposition.
+
+        Remember that the for-loop has a target variable that will be assigned,
+        an iterator to iterate over, a loop body and an else clause. The AST
+        node has the following signature:
+
+            ast.For(target, iter, body, orelse, type_comment)
+
+        Remember also that Python for-loops can have an else branch:
+
+        def function(a: int) -> None
+            c = 0
+            for i in range(10):
+                c += i
+                if i == a:
+                    i = 420  # set i arbitrarily
+                    break    # break from loop, bypass else: clause
+            else:
+                c += 1       # execute if we never hit break on loop conclusion
+        return c, i
+
+        So, effectively, to decompose the for loop, we need to setup the
+        iterator by calling 'iter(iter)' and assign it, initialize the 'target
+        variable and then check if the iterator has a next value. If it does,
+        we need to enter the body and then check the iterator again and again
+        and again.. until there are no items left, at which point we execute
+        the else clause.
+
+        The Python for-loop usually waits for the iterator to raise a
+        StopIteration exception to determine when the iteration has concluded.
+        However, it is possible to use the next() method with a second argument
+        to avoid exception handling here:
+
+            i = next(iter, "__sentinel__")
+            if i != "__sentinel__":
+                ...
+
+        Lastly, it is important to also remember that the target variable
+        escapes the scope of the for loop:
+
+            >>> for i in range(1):
+            ...     print("hello loop")
+            ...
+            hello loop
+            >>> i
+            0
+            >>>
+
+        So, to summarize: we want to decompose a Python for loop into a while
+        loop with some assignments. The target iteration variable must escape
+        the scope.
+
+        Consider again the following function:
+
+        def function(a: int) -> None
+            c = 0
+            for i in range(10):
+                c += i
+                if i == a:
+                    i = 420
+                    break
+            else:
+                c += 1
+            return c, i
+
+        This will be decomposed as the following construct that can be encoded
+        using the available block and edge primitives of the CFG.
+
+        def function(a: int) -> None
+            c = 0
+         *  __iterator_1__ = iter(range(10))  # setup iterator
+         *  i = None                          # assign target, in this case i
+            while True:                       # loop until we break
+         *      __iter_last_1__ = i           # backup value of i
+         *      i = next(__iterator_1__, '__sentinel__')  # get next i
+         *      if i != '__sentinel__':       # regular iteration
+                    c += i                    # add to accumulator
+                    if i == a:                # check for early exit
+                        i = 420               # set i to some wild value
+                        break                 # break from while True
+                else:                         # for-else clause
+         *          i == __iter_last_1__      # restore value of i
+                    c += 1                    # execute code in for-else clause
+                    break                     # break from while True
+            return c
+
+        The above is actually a full Python source reconstruction. In the
+        implementation below, it is only necessary to write some of the special
+        assignments (marked above with a *-prefix) into the blocks of the CFG.
+        All of the control-flow inside the function will be represented by the
+        directed edges of the CFG.
+
+        The first two assignments are for the pre-header:
+
+         *  __iterator_1__ = iter(range(10))  # setup iterator
+         *  i = None                          # assign target, in this case i
+
+        The next three is for the header, the predicate determines the end of
+        the loop.
+
+         *      __iter_last_1__ = i           # backup value of i
+         *      i = next(__iterator_1__, '__sentinel__')  # get next i
+         *      if i != '__sentinel__':       # regular iteration
+
+         And lastly, one assignment in the for-else clause
+
+         *          i == __iter_last_1__      # restore value of i
+
+        We modify the pre-header, the header and the else blocks with
+        appropriate Python statements in the following implementation. The
+        Python code is injected by generating Python source using f-strings and
+        then using the 'unparse()' function of the 'ast' module to 'codegen'
+        the required 'ast.AST' objects into the blocks of the CFG.
+
+        Lastly yhe important thing to observe is that we can not ignore the else
+        clause, since this must contain the reset of the variable i, which will
+        have been set to '__sentinel__'. This reset is requires such that i can
+        escape the scope of the for-loop.
+
+        """
+        # Preallocate indices for header, body, else, and exiting blocks.
         head_index = self.block_index
         body_index = self.block_index + 1
         else_index = self.block_index + 2
@@ -365,7 +498,7 @@ class AST2SCFGTransformer:
 
         # Assign the components of the for-loop to variables. These variables
         # are versioned using the index of the loop header so that scopes can
-        # be nested. While this is structly required for the 'iter_setup' it is
+        # be nested. While this is strictly required for the 'iter_setup' it is
         # technically optional for the 'last_target_value' we version it too so
         # that the two can easily be matched when visually inspecting the CFG.
         target = ast.unparse(node.target)
@@ -373,7 +506,7 @@ class AST2SCFGTransformer:
         iter_assign = f"__iterator_{head_index}__"
         last_target_value = f"__iter_last_{head_index}__"
 
-        # Emit iter setup to pre-header
+        # Emit iterator setup to pre-header.
         preheader_code = textwrap.dedent(
             f"""
             {iter_assign} = iter({iter_setup})
@@ -382,13 +515,16 @@ class AST2SCFGTransformer:
         )
         self.codegen(ast.parse(preheader_code).body)
 
-        # Point whatever the current block to header block
+        # Point whatever the current block to header block.
         self.current_block.set_jump_targets(head_index)
-        # And create new header block
+        # And create new header block.
         self.add_block(head_index)
 
-        # Emit header instructions. The '__sentinel__' is an unversioned
-        # marker, so it need not be versioned.
+        # Emit header instructions. This first makes a backup of the iteration
+        # target and then checks if the iterator is exhausted and if the loop
+        # should continue.  The '__sentinel__' is an singleton style marker, so
+        # it need not be versioned. 
+
         header_code = textwrap.dedent(
             f"""
             {last_target_value} = {target}
@@ -406,7 +542,7 @@ class AST2SCFGTransformer:
         # Setup loop stack for recursion.
         self.loop_stack.append(LoopIndices(head_index, exit_index))
 
-        # Recurse into it.
+        # Recurs into the loop body (this may modify current_block).
         self.codegen(node.body)
         # After recursion, seal current block.
         self.seal_block(head_index)
@@ -417,7 +553,7 @@ class AST2SCFGTransformer:
             loop_indices.head == head_index and loop_indices.exit == exit_index
         )
 
-        # Create else block.h
+        # Create else block.
         self.add_block(else_index)
         self.current_block.set_jump_targets(exit_index)
 
@@ -445,10 +581,10 @@ class AST2SCFGTransformer:
 
 
 def AST2SCFG(code: Callable[..., Any]) -> SCFG:
-    """Tranform Python function into an SCFG."""
+    """Transform Python function into an SCFG."""
     return AST2SCFGTransformer(code).transform_to_SCFG()
 
 
 def SCFG2AST(scfg: SCFG) -> ast.FunctionDef:  # type: ignore
-    """Tranform SCFG with PythonASTBlocks into an AST FunctionDef."""
+    """Transform SCFG with PythonASTBlocks into an AST FunctionDef."""
     # TODO
