@@ -170,7 +170,7 @@ class LoopIndices:
     exit: int
 
 
-class ASTHandler:
+class AST2SCFGTranformer:
     """ASTHandler class.
 
     The ASTHandler class is responsible for converting code in the form of a

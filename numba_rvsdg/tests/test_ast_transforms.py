@@ -3,13 +3,13 @@ from unittest import main, TestCase
 import textwrap
 import yaml
 
-from numba_rvsdg.core.datastructures.ast_transforms import ASTHandler
+from numba_rvsdg.core.datastructures.ast_transforms import AST2SCFGTranformer
 
 
-handler = ASTHandler()
+handler = AST2SCFGTranformer()
 
 
-class TestASTConversion(TestCase):
+class TestAST2SCFGTransformer(TestCase):
 
     def compare(self, function, expected):
         astcfg = handler.generate_ASTCFG(function)
