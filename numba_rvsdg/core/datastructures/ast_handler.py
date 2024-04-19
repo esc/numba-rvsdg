@@ -165,6 +165,7 @@ class ASTCFG(dict[str, WriteableBasicBlock]):
 
 @dataclass(frozen=True)
 class LoopIndices:
+    """Structure to hold the head and exit block indices of a loop."""
     head: int
     exit: int
 
