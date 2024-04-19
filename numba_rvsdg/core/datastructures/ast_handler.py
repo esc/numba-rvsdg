@@ -54,8 +54,22 @@ class WriteableBasicBlock:
         """Check if the last instruction is a continue statement."""
         return self.is_instruction(ast.Continue)
 
-    def seal(self, head_index: int, exit_index: int, dflt_index: int) -> None:
-        """Seal the block by setting the jump targets."""
+    def seal_outside_loop(self, index: int) -> None:
+        """Seal the block by setting the jump targets based on the last
+        instruction.
+        """
+        if self.is_return():
+            pass
+        else:
+            self.set_jump_targets(index)
+
+    def seal_inside_loop(
+        self, head_index: int, exit_index: int, default_index: int
+    ) -> None:
+        """Seal the block by setting the jump targets based on the last
+        instruction and taking into account that this block is nested in a
+        loop.
+        """
         if self.is_continue():
             self.set_jump_targets(head_index)
         elif self.is_break():
@@ -63,7 +77,7 @@ class WriteableBasicBlock:
         elif self.is_return():
             pass
         else:
-            self.set_jump_targets(dflt_index)
+            self.set_jump_targets(default_index)
 
     def __repr__(self) -> str:
         return (
@@ -257,11 +271,14 @@ class ASTHandler:
 
     def seal(self, default_index: int) -> None:
         """Seal the current block by setting the jump_targets."""
-        self.current_block.seal(
-            self.loop_stack[-1].head if self.loop_stack else -1,
-            self.loop_stack[-1].exit if self.loop_stack else -1,
-            default_index,
-        )
+        if self.loop_stack:
+            self.current_block.seal_inside_loop(
+                self.loop_stack[-1].head,
+                self.loop_stack[-1].exit,
+                default_index,
+            )
+        else:
+            self.current_block.seal_outside_loop(default_index)
 
     def handle_if(self, node: ast.If) -> None:
         """Handle if statement."""
