@@ -483,7 +483,7 @@ class AST2SCFGTransformer:
         then using the 'unparse()' function of the 'ast' module to 'codegen'
         the required 'ast.AST' objects into the blocks of the CFG.
 
-        Lastly yhe important thing to observe is that we can not ignore the else
+        Lastly the important thing to observe is that we can not ignore the else
         clause, since this must contain the reset of the variable i, which will
         have been set to '__sentinel__'. This reset is requires such that i can
         escape the scope of the for-loop.
