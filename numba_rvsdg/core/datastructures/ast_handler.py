@@ -404,7 +404,6 @@ class ASTHandler:
         # Create exit block
         self.add_block(exit_index)
 
-
     def render(self) -> None:
         """Render the CFG contained in this handler as a SCFG.
 
