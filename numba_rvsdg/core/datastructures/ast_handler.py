@@ -108,6 +108,7 @@ class ASTCFG(dict[str, WriteableBasicBlock]):
 
     def prune_unreachable(self) -> set[WriteableBasicBlock]:
         """Prune unreachable nodes from the CFG."""
+        # Assume that the entry block is named zero (0)
         to_visit, reachable, unreachable = set("0"), set(), set()
         # Visit all reachable blocks
         while to_visit:
