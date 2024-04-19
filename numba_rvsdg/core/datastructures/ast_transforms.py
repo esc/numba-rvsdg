@@ -350,6 +350,7 @@ class AST2SCFGTransformer:
         self.add_block(exit_index)
 
     def handle_for(self, node: ast.For) -> None:
+        """Handle for statement."""
         # Preallocate indices for blocks
         head_index = self.block_index
         body_index = self.block_index + 1
@@ -434,10 +435,12 @@ class AST2SCFGTransformer:
 
 
 def AST2SCFG(code: Callable[..., Any]) -> SCFG:
+    """ Tranform Python function into an SCFG. """
     return AST2SCFGTransformer(code).transform_to_SCFG()
 
 
 def SCFG2AST(scfg: SCFG) -> ast.FunctionDef:  # type: ignore
+    """ Tranform SCFG with PythonASTBlocks into an AST FunctionDef. """
     # TODO
     pass
 
@@ -445,14 +448,13 @@ def SCFG2AST(scfg: SCFG) -> ast.FunctionDef:  # type: ignore
 if __name__ == "__main__":
 
     def function(a: int, b: int) -> int:
-        for i in range(100):
-            i += 1
+        for i in range(2):
             if i == a:
-                i = 666
+                i = 3
                 return i
             elif i == b:
-                i = 777
-                return i
+                i = 4
+                break
             else:
                 continue
         return i
