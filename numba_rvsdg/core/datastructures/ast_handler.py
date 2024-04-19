@@ -32,23 +32,29 @@ class WriteableBasicBlock:
         )
 
     def set_jump_targets(self, *indices: int) -> None:
+        """Set jump targets for the block."""
         self.jump_targets = [str(a) for a in indices]
 
     def is_instruction(self, instruction: type[ast.AST]) -> bool:
+        """Check if the last instruction is of a certain type."""
         return len(self.instructions) > 0 and isinstance(
             self.instructions[-1], instruction
         )
 
     def is_return(self) -> bool:
+        """Check if the last instruction is a return statement."""
         return self.is_instruction(ast.Return)
 
     def is_break(self) -> bool:
+        """Check if the last instruction is a break statement."""
         return self.is_instruction(ast.Break)
 
     def is_continue(self) -> bool:
+        """Check if the last instruction is a continue statement."""
         return self.is_instruction(ast.Continue)
 
     def seal(self, head_index: int, exit_index: int, dflt_index: int) -> None:
+        """Seal the block by setting the jump targets."""
         if self.is_continue():
             self.set_jump_targets(head_index)
         elif self.is_break():
