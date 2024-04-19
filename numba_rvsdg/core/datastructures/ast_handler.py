@@ -133,17 +133,17 @@ class ASTCFG(dict[str, WriteableBasicBlock]):
                 it = block.jump_targets[0]
                 # iterate over the nodes looking for nodes that point to the
                 # removed node
-                for j in list(self.blocks.values()):
-                    if len(j.jump_targets) == 0:
+                for b in list(self.values()):
+                    if len(b.jump_targets) == 0:
                         continue
-                    elif len(j.jump_targets) == 1:
-                        if j.jump_targets[0] == name:
-                            j.jump_targets[0] = it
-                    elif len(j.jump_targets) == 2:
-                        if j.jump_targets[0] == name:
-                            j.jump_targets[0] = it
-                        elif j.jump_targets[1] == name:
-                            j.jump_targets[1] = it
+                    elif len(b.jump_targets) == 1:
+                        if b.jump_targets[0] == name:
+                            b.jump_targets[0] = it
+                    elif len(b.jump_targets) == 2:
+                        if b.jump_targets[0] == name:
+                            b.jump_targets[0] = it
+                        elif b.jump_targets[1] == name:
+                            b.jump_targets[1] = it
         return empty
 
 
