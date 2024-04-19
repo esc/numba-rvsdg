@@ -194,19 +194,6 @@ class AST2SCFGTransformer:
         # Stack for header and exiting block of current loop
         self.loop_stack: list[LoopIndices] = []
 
-    def transform(self) -> None:
-        """Handle Python function."""
-        # Convert source code into AST
-        tree = ast.parse(textwrap.dedent(inspect.getsource(self.code))).body
-        # Assert that the code handed in was a function, we can only convert
-        # functions.
-        assert isinstance(tree[0], ast.FunctionDef)
-        # Run recrisive code generation
-        self.codegen(tree)
-        if self.prune:
-            _ = self.blocks.prune_unreachable()
-            _ = self.blocks.prune_empty()
-
     def transform_to_ASTCFG(self) -> ASTCFG:
         """Generate ASTCFG from Python function."""
         self.transform()
@@ -217,16 +204,41 @@ class AST2SCFGTransformer:
         self.transform()
         return self.blocks.to_SCFG()
 
-    def codegen(self, tree: list[type[ast.AST]] | list[ast.stmt]) -> None:
-        """Recursively Generate code from a list of AST nodes."""
-        for node in tree:
-            self.handle_ast_node(node)
-
     def add_block(self, index: int) -> None:
         """Create block, add to CFG and set as current_block."""
         self.blocks[str(index)] = self.current_block = WritableASTBlock(
             name=str(index)
         )
+
+    def seal(self, default_index: int) -> None:
+        """Seal the current block by setting the jump_targets."""
+        if self.loop_stack:
+            self.current_block.seal_inside_loop(
+                self.loop_stack[-1].head,
+                self.loop_stack[-1].exit,
+                default_index,
+            )
+        else:
+            self.current_block.seal_outside_loop(default_index)
+
+    def transform(self) -> None:
+        """Transform Python function stored as self.code."""
+        # Convert source code into AST
+        tree = ast.parse(textwrap.dedent(inspect.getsource(self.code))).body
+        # Assert that the code handed in was a function, we can only convert
+        # functions.
+        assert isinstance(tree[0], ast.FunctionDef)
+        # Run recrisive code generation
+        self.codegen(tree)
+        # Prune if needed
+        if self.prune:
+            _ = self.blocks.prune_unreachable()
+            _ = self.blocks.prune_empty()
+
+    def codegen(self, tree: list[type[ast.AST]] | list[ast.stmt]) -> None:
+        """Recursively Generate code from a list of AST nodes."""
+        for node in tree:
+            self.handle_ast_node(node)
 
     def handle_ast_node(self, node: type[ast.AST] | ast.stmt) -> None:
         """Dispatch an AST node to handle."""
@@ -259,17 +271,6 @@ class AST2SCFGTransformer:
         if not isinstance(node.body[-1], ast.Return):
             node.body.append(ast.Return(None))
         self.codegen(node.body)
-
-    def seal(self, default_index: int) -> None:
-        """Seal the current block by setting the jump_targets."""
-        if self.loop_stack:
-            self.current_block.seal_inside_loop(
-                self.loop_stack[-1].head,
-                self.loop_stack[-1].exit,
-                default_index,
-            )
-        else:
-            self.current_block.seal_outside_loop(default_index)
 
     def handle_if(self, node: ast.If) -> None:
         """Handle if statement."""
@@ -409,7 +410,8 @@ class AST2SCFGTransformer:
         self.add_block(else_index)
         self.current_block.set_jump_targets(exit_index)
 
-        # Emit orelse instructions
+        # Emit orelse instructions. Needs to be prefixed with an assignment
+        # such that the for loop target can escape the scope of the loop.
         else_code = textwrap.dedent(
             f"""
             {target} = {last_target_value}
