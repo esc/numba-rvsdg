@@ -5,7 +5,12 @@ import textwrap
 from dataclasses import dataclass
 
 from numba_rvsdg.core.datastructures.scfg import SCFG
-from numba_rvsdg.core.datastructures.basic_block import PythonASTBlock
+from numba_rvsdg.core.datastructures.basic_block import (
+    PythonASTBlock,
+    RegionBlock,
+    SyntheticAssignment,
+    SyntheticExitingLatch,
+)
 
 
 class WritableASTBlock:
@@ -655,6 +660,126 @@ class AST2SCFGTransformer:
         self.blocks.to_SCFG().render()
 
 
+class SCFG2ASTTransformer:
+
+    def transform(
+        self, original: ast.FunctionDef, scfg: SCFG
+    ) -> ast.FunctionDef:
+        body: list[ast.AST] = []
+        self.scfg_stack = [scfg]
+        self.region_stack = [scfg.region]
+        for name, block in scfg:
+            body.extend(self.codegen(block))
+            break
+        fdef = ast.FunctionDef(
+            name="transformed_function",
+            args=original.args,
+            body=body,
+            lineno=0,
+            decorator_list=original.decorator_list,
+            returns=original.returns,
+        )
+        return fdef
+
+    def lookup(self, item: Any) -> Any:
+        subregion_scfg = self.region_stack[-1].subregion
+        parent_region_block = self.region_stack[-1].parent_region
+        if item in subregion_scfg:
+            return subregion_scfg[item]
+        else:
+            return self.rlookup(parent_region_block, item)
+
+    def rlookup(self, region_block: RegionBlock, item: Any) -> Any:
+        if item in region_block.subregion:
+            return region_block.subregion[item]
+        elif region_block.parent_region is not None:
+            return self.rlookup(region_block.parent_region, item)
+        else:
+            raise KeyError(f"Item {item} not found in subregion or parent")
+
+    def codegen(self, block: Any) -> list[ast.AST]:
+        print(block.name)
+        if type(block) is PythonASTBlock:
+            if len(block.jump_targets) == 2:
+                if type(block.tree[-1]) is ast.Name:
+                    test = block.tree[-1]
+                else:
+                    test = block.tree[-1].value
+                body = self.codegen(self.lookup(block.jump_targets[0]))
+                orelse = self.codegen(self.lookup(block.jump_targets[1]))
+                if_node = ast.If(test, body, orelse)
+                return [block.tree[:-1]] + [if_node]
+            elif block.fallthrough:
+                return block.tree + self.codegen(
+                    self.lookup(block.jump_targets[0])
+                )
+            elif block.is_exiting:
+                return block.tree
+            else:
+                raise NotImplementedError("Block not implemented")
+        elif type(block) is RegionBlock:
+            self.region_stack.append(block)
+            if block.kind == "head":
+                return self.codegen(block.subregion[block.header])
+            elif block.kind == "tail":
+                pass
+            elif block.kind == "branch":
+                self.scfg_stack.append(block.subregion)
+                return_value = self.codegen(block.subregion[block.header])
+                self.scfg_stack.pop()
+                self.region_stack.pop()
+                return return_value
+            elif block.kind == "loop":
+                test = ast.Constant(value=True)
+                self.scfg_stack.append(block.subregion)
+                body = self.codegen(
+                    block.subregion[block.subregion.find_head()]
+                )
+                self.scfg_stack.pop()
+                while_node = ast.While(test, body, [])
+                synth_exiting_latch = block.subregion[block.exiting].subregion[
+                    block.subregion[block.exiting].header
+                ]
+                assert type(synth_exiting_latch) is SyntheticExitingLatch
+                assert len(synth_exiting_latch.jump_targets) == 1
+                assert len(synth_exiting_latch.backedges) == 1
+                compare_value = [
+                    i
+                    for i, v in synth_exiting_latch.branch_value_table.items()
+                    if v == synth_exiting_latch.backedges[0]
+                ][0]
+                if_beak_node_test = ast.Compare(
+                    left=ast.Name(synth_exiting_latch.variable),
+                    ops=[ast.Eq()],
+                    comparators=[ast.Constant(compare_value)],
+                )
+                if_break_node = ast.If(
+                    test=if_beak_node_test,
+                    body=[ast.Continue()],
+                    orelse=[ast.Break()],
+                )
+                while_node.body.append(if_break_node)
+                # need to lookup the block that the while loop exits to
+                exit_block_name = synth_exiting_latch.jump_targets[0]
+                exit_block = block.parent_region.subregion[exit_block_name]
+                return [while_node] + self.codegen(exit_block)
+            else:
+                pass
+            self.region_stack.pop()
+        elif type(block) is SyntheticAssignment:
+            targets, values = zip(*block.variable_assignment.items())
+            assign_node = ast.Assign(
+                [ast.Name(t) for t in targets],
+                [ast.Constant(v) for v in values],
+                lineno=0,
+            )
+            return [assign_node]
+        elif type(block) is SyntheticExitBranch:
+        else:
+            raise Exception(block, type(block))
+        return []
+
+
 def AST2SCFG(code: str | list[ast.FunctionDef] | Callable[..., Any]) -> SCFG:
     """Transform Python function into an SCFG."""
     return AST2SCFGTransformer(code).transform_to_SCFG()
@@ -663,3 +788,22 @@ def AST2SCFG(code: str | list[ast.FunctionDef] | Callable[..., Any]) -> SCFG:
 def SCFG2AST(scfg: SCFG) -> ast.FunctionDef:  # type: ignore
     """Transform SCFG with PythonASTBlocks into an AST FunctionDef."""
     # TODO
+
+
+if __name__ == "__main__":
+
+    def function(a: bool) -> int:
+        c = 0
+        for i in range(10):
+            c += 1
+            if a:
+                break
+        return c
+
+    scfg = AST2SCFG(function)
+    scfg.restructure()
+    original = ast.parse(textwrap.dedent(inspect.getsource(function))).body[0]
+    t = SCFG2ASTTransformer()
+    f = t.transform(original, scfg)
+    n = ast.unparse(f)
+    print(n)
