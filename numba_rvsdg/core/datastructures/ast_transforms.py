@@ -10,6 +10,7 @@ from numba_rvsdg.core.datastructures.basic_block import (
     RegionBlock,
     SyntheticTail,
     SyntheticFill,
+    SyntheticReturn,
     SyntheticAssignment,
     SyntheticExitingLatch,
     SyntheticExitBranch,
@@ -713,7 +714,17 @@ class SCFG2ASTTransformer:
                 orelse = self.codegen(self.lookup(block.jump_targets[1]))
                 if_node = ast.If(test, body, orelse)
                 return block.tree[:-1] + [if_node]
-            elif block.fallthrough or block.is_exiting:
+            elif type(block.tree[-1]) is ast.Return:
+                return_statement = block.tree[-1]
+                assert type(return_statement) is ast.Return
+                assign_statement = ast.Assign([ast.Name('__return_value__')],
+                                              return_statement.value if
+                                              type(return_statement.value) in
+                                              (ast.Name, ast.Constant, ast.Tuple) else
+                                              ast.Constant(return_statement.value),
+                                              lineno=0)
+                return block.tree[:-1] + [assign_statement]
+            elif block.fallthrough:
                 return block.tree
             else:
                 raise NotImplementedError
@@ -754,6 +765,8 @@ class SCFG2ASTTransformer:
             pass
         elif type(block) is SyntheticFill:
             return [ast.Pass()]
+        elif type(block) is SyntheticReturn:
+            return [ast.Return(ast.Name("__return_value__"))]
         elif type(block) is SyntheticExitBranch:
             assert len(block.jump_targets) == 2
             assert len(block.backedges) == 0
