@@ -17,11 +17,14 @@ class TestAST2SCFGTransformer(TestCase):
         empty: set[int] = set(),
         arguments: list[any] = [],
     ):
+        # Girst test against the expected CFG...
         ast2scfg_transformer = AST2SCFGTransformer(function)
         astcfg = ast2scfg_transformer.transform_to_ASTCFG()
         self.assertEqual(expected, astcfg.to_dict())
         self.assertEqual(unreachable, {i.name for i in astcfg.unreachable})
         self.assertEqual(empty, {i.name for i in astcfg.empty})
+        # Then restructure, synthesieze python and run origanl and transformed
+        # on the same arguments and assert they are the same.
         scfg = astcfg.to_SCFG()
         scfg.restructure()
         scfg2ast = SCFG2ASTTransformer()
