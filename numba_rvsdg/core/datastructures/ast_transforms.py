@@ -8,6 +8,8 @@ from numba_rvsdg.core.datastructures.scfg import SCFG
 from numba_rvsdg.core.datastructures.basic_block import (
     PythonASTBlock,
     RegionBlock,
+    SyntheticTail,
+    SyntheticFill,
     SyntheticAssignment,
     SyntheticExitingLatch,
     SyntheticExitBranch,
@@ -721,20 +723,23 @@ class SCFG2ASTTransformer:
         elif type(block) is RegionBlock:
             self.region_stack.append(block)
             if block.kind == "head":
-                return self.codegen(block.subregion[block.header])
+                rval = []
+                for b in block.subregion.concealed_region_view.values():
+                    rval.extend(self.codegen(b))
             elif block.kind == "tail":
-                return self.codegen(block.subregion[block.header])
+                rval = self.codegen(block.subregion[block.header])
             elif block.kind == "branch":
-                return_value = [self.codegen(b) for n, b in block.subregion]
+                rval = [self.codegen(b) for b in
+                        block.subregion.concealed_region_view.values() if not
+                        (type(b) is RegionBlock and b.kind == "branch")]
                 #self.scfg_stack.append(block.subregion)
                 #return_value = self.codegen(block.subregion[block.header])
                 #self.scfg_stack.pop()
                 #self.region_stack.pop()
-                return return_value
             elif block.kind == "loop":
                 #self.scfg_stack.append(block.subregion)
-                self.scfg_stack.pop()
-                return [ast.While(test=ast.Constant(value=True),
+                #self.scfg_stack.pop()
+                rval = [ast.While(test=ast.Constant(value=True),
                                   body=self.codegen(block.subregion[block.header])
                                   + self.codegen(block.subregion[block.exiting]),
                                   orelse=[])]
@@ -742,18 +747,37 @@ class SCFG2ASTTransformer:
                 #exit_block_name = synth_exiting_latch.jump_targets[0]
                 #exit_block = block.parent_region.subregion[exit_block_name]
             else:
-                pass
+                raise Exception
             self.region_stack.pop()
+            return rval
         elif type(block) is SyntheticAssignment:
-            targets, values = zip(*block.variable_assignment.items())
-            assign_node = ast.Assign(
-                [ast.Name(t) for t in targets],
-                [ast.Constant(v) for v in values],
-                lineno=0,
-            )
-            return [assign_node]
+            return [ast.Assign([ast.Name(t)], ast.Constant(v), lineno=0)
+                    for t, v in block.variable_assignment.items()]
+        elif type(block) is SyntheticTail:
+                pass
+        elif type(block) is SyntheticFill:
+                return [ast.Pass()]
         elif type(block) is SyntheticExitBranch:
-            raise Exception()
+            assert len(block.jump_targets) == 2
+            assert len(block.backedges) == 0
+            compare_value = [
+                i
+                for i, v in block.branch_value_table.items()
+                if v == block.jump_targets[0]
+            ][0]
+            if_beak_node_test = ast.Compare(
+                left=ast.Name(block.variable),
+                ops=[ast.Eq()],
+                comparators=[ast.Constant(compare_value)],
+            )
+            body = self.codegen(self.lookup(block.jump_targets[0]))
+            orelse = self.codegen(self.lookup(block.jump_targets[1]))
+            if_break_node = ast.If(
+                test=if_beak_node_test,
+                body=body,
+                orelse=orelse,
+            )
+            return [if_break_node]
         elif type(block) is SyntheticExitingLatch:
             synth_exiting_latch = block
             assert type(synth_exiting_latch) is SyntheticExitingLatch
