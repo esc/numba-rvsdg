@@ -10,6 +10,7 @@ from numba_rvsdg.core.datastructures.basic_block import (
     RegionBlock,
     SyntheticAssignment,
     SyntheticExitingLatch,
+    SyntheticExitBranch,
 )
 
 
@@ -668,9 +669,10 @@ class SCFG2ASTTransformer:
         body: list[ast.AST] = []
         self.scfg_stack = [scfg]
         self.region_stack = [scfg.region]
-        for name, block in scfg:
+        for name, block in scfg.concealed_region_view.items():
+            if type(block) is RegionBlock and block.kind == 'branch':
+                continue
             body.extend(self.codegen(block))
-            break
         fdef = ast.FunctionDef(
             name="transformed_function",
             args=original.args,
@@ -698,7 +700,7 @@ class SCFG2ASTTransformer:
             raise KeyError(f"Item {item} not found in subregion or parent")
 
     def codegen(self, block: Any) -> list[ast.AST]:
-        print(block.name)
+        print(type(block), block.name)
         if type(block) is PythonASTBlock:
             if len(block.jump_targets) == 2:
                 if type(block.tree[-1]) is ast.Name:
@@ -710,9 +712,8 @@ class SCFG2ASTTransformer:
                 if_node = ast.If(test, body, orelse)
                 return [block.tree[:-1]] + [if_node]
             elif block.fallthrough:
-                return block.tree + self.codegen(
-                    self.lookup(block.jump_targets[0])
-                )
+                return block.tree #+ self.codegen(self.lookup(block.jump_targets[0])
+                #)
             elif block.is_exiting:
                 return block.tree
             else:
@@ -722,47 +723,24 @@ class SCFG2ASTTransformer:
             if block.kind == "head":
                 return self.codegen(block.subregion[block.header])
             elif block.kind == "tail":
-                pass
+                return self.codegen(block.subregion[block.header])
             elif block.kind == "branch":
-                self.scfg_stack.append(block.subregion)
-                return_value = self.codegen(block.subregion[block.header])
-                self.scfg_stack.pop()
-                self.region_stack.pop()
+                return_value = [self.codegen(b) for n, b in block.subregion]
+                #self.scfg_stack.append(block.subregion)
+                #return_value = self.codegen(block.subregion[block.header])
+                #self.scfg_stack.pop()
+                #self.region_stack.pop()
                 return return_value
             elif block.kind == "loop":
-                test = ast.Constant(value=True)
-                self.scfg_stack.append(block.subregion)
-                body = self.codegen(
-                    block.subregion[block.subregion.find_head()]
-                )
+                #self.scfg_stack.append(block.subregion)
                 self.scfg_stack.pop()
-                while_node = ast.While(test, body, [])
-                synth_exiting_latch = block.subregion[block.exiting].subregion[
-                    block.subregion[block.exiting].header
-                ]
-                assert type(synth_exiting_latch) is SyntheticExitingLatch
-                assert len(synth_exiting_latch.jump_targets) == 1
-                assert len(synth_exiting_latch.backedges) == 1
-                compare_value = [
-                    i
-                    for i, v in synth_exiting_latch.branch_value_table.items()
-                    if v == synth_exiting_latch.backedges[0]
-                ][0]
-                if_beak_node_test = ast.Compare(
-                    left=ast.Name(synth_exiting_latch.variable),
-                    ops=[ast.Eq()],
-                    comparators=[ast.Constant(compare_value)],
-                )
-                if_break_node = ast.If(
-                    test=if_beak_node_test,
-                    body=[ast.Continue()],
-                    orelse=[ast.Break()],
-                )
-                while_node.body.append(if_break_node)
-                # need to lookup the block that the while loop exits to
-                exit_block_name = synth_exiting_latch.jump_targets[0]
-                exit_block = block.parent_region.subregion[exit_block_name]
-                return [while_node] + self.codegen(exit_block)
+                return [ast.While(test=ast.Constant(value=True),
+                                  body=self.codegen(block.subregion[block.header])
+                                  + self.codegen(block.subregion[block.exiting]),
+                                  orelse=[])]
+                ## need to lookup the block that the while loop exits to
+                #exit_block_name = synth_exiting_latch.jump_targets[0]
+                #exit_block = block.parent_region.subregion[exit_block_name]
             else:
                 pass
             self.region_stack.pop()
@@ -775,6 +753,28 @@ class SCFG2ASTTransformer:
             )
             return [assign_node]
         elif type(block) is SyntheticExitBranch:
+            raise Exception()
+        elif type(block) is SyntheticExitingLatch:
+            synth_exiting_latch = block
+            assert type(synth_exiting_latch) is SyntheticExitingLatch
+            assert len(synth_exiting_latch.jump_targets) == 1
+            assert len(synth_exiting_latch.backedges) == 1
+            compare_value = [
+                i
+                for i, v in synth_exiting_latch.branch_value_table.items()
+                if v == synth_exiting_latch.backedges[0]
+            ][0]
+            if_beak_node_test = ast.Compare(
+                left=ast.Name(synth_exiting_latch.variable),
+                ops=[ast.Eq()],
+                comparators=[ast.Constant(compare_value)],
+            )
+            if_break_node = ast.If(
+                test=if_beak_node_test,
+                body=[ast.Continue()],
+                orelse=[ast.Break()],
+            )
+            return [if_break_node]
         else:
             raise Exception(block, type(block))
         return []
@@ -797,7 +797,7 @@ if __name__ == "__main__":
         for i in range(10):
             c += 1
             if a:
-                break
+               break
         return c
 
     scfg = AST2SCFG(function)
