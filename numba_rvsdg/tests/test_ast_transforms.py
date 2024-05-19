@@ -154,7 +154,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "3",
             },
         }
-        self.compare(function, expected, empty={"2"})
+        self.compare(function, expected, empty={"2"}, arguments=[(9,), (10,)])
 
     def test_if_else_return(self):
         def function(x: int) -> int:
