@@ -669,7 +669,6 @@ class SCFG2ASTTransformer:
         self, original: ast.FunctionDef, scfg: SCFG
     ) -> ast.FunctionDef:
         body: list[ast.AST] = []
-        self.scfg_stack = [scfg]
         self.region_stack = [scfg.region]
         for name, block in scfg.concealed_region_view.items():
             if type(block) is RegionBlock and block.kind == 'branch':
@@ -713,13 +712,10 @@ class SCFG2ASTTransformer:
                 orelse = self.codegen(self.lookup(block.jump_targets[1]))
                 if_node = ast.If(test, body, orelse)
                 return [block.tree[:-1]] + [if_node]
-            elif block.fallthrough:
-                return block.tree #+ self.codegen(self.lookup(block.jump_targets[0])
-                #)
-            elif block.is_exiting:
+            elif block.fallthrough or block.is_exiting:
                 return block.tree
             else:
-                raise NotImplementedError("Block not implemented")
+                raise NotImplementedError
         elif type(block) is RegionBlock:
             self.region_stack.append(block)
             if block.kind == "head":
@@ -732,22 +728,13 @@ class SCFG2ASTTransformer:
                 rval = [self.codegen(b) for b in
                         block.subregion.concealed_region_view.values() if not
                         (type(b) is RegionBlock and b.kind == "branch")]
-                #self.scfg_stack.append(block.subregion)
-                #return_value = self.codegen(block.subregion[block.header])
-                #self.scfg_stack.pop()
-                #self.region_stack.pop()
             elif block.kind == "loop":
-                #self.scfg_stack.append(block.subregion)
-                #self.scfg_stack.pop()
                 rval = [ast.While(test=ast.Constant(value=True),
-                                  body=self.codegen(block.subregion[block.header])
-                                  + self.codegen(block.subregion[block.exiting]),
-                                  orelse=[])]
-                ## need to lookup the block that the while loop exits to
-                #exit_block_name = synth_exiting_latch.jump_targets[0]
-                #exit_block = block.parent_region.subregion[exit_block_name]
+                        body=self.codegen(block.subregion[block.header])
+                        + self.codegen(block.subregion[block.exiting]),
+                        orelse=[])]
             else:
-                raise Exception
+                raise NotImplementedError
             self.region_stack.pop()
             return rval
         elif type(block) is SyntheticAssignment:
@@ -779,17 +766,15 @@ class SCFG2ASTTransformer:
             )
             return [if_break_node]
         elif type(block) is SyntheticExitingLatch:
-            synth_exiting_latch = block
-            assert type(synth_exiting_latch) is SyntheticExitingLatch
-            assert len(synth_exiting_latch.jump_targets) == 1
-            assert len(synth_exiting_latch.backedges) == 1
+            assert len(block.jump_targets) == 1
+            assert len(block.backedges) == 1
             compare_value = [
                 i
-                for i, v in synth_exiting_latch.branch_value_table.items()
-                if v == synth_exiting_latch.backedges[0]
+                for i, v in block.branch_value_table.items()
+                if v == block.backedges[0]
             ][0]
             if_beak_node_test = ast.Compare(
-                left=ast.Name(synth_exiting_latch.variable),
+                left=ast.Name(block.variable),
                 ops=[ast.Eq()],
                 comparators=[ast.Constant(compare_value)],
             )
@@ -800,7 +785,7 @@ class SCFG2ASTTransformer:
             )
             return [if_break_node]
         else:
-            raise Exception(block, type(block))
+            raise NotImplementedError
         return []
 
 
@@ -821,7 +806,7 @@ if __name__ == "__main__":
         for i in range(10):
             c += 1
             if a:
-               break
+                break
         return c
 
     scfg = AST2SCFG(function)
