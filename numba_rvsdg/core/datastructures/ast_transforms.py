@@ -338,7 +338,7 @@ class AST2SCFGTransformer:
         # end up being an unreachable block if all other paths through the
         # program already call return.
         if not isinstance(node.body[-1], ast.Return):
-            node.body.append(ast.Return(None))
+            node.body.append(ast.Return(ast.Constant(None)))
         self.codegen(node.body)
 
     def handle_if(self, node: ast.If) -> None:
@@ -715,15 +715,13 @@ class SCFG2ASTTransformer:
                 if_node = ast.If(test, body, orelse)
                 return block.tree[:-1] + [if_node]
             elif type(block.tree[-1]) is ast.Return:
-                return_statement = block.tree[-1]
-                assert type(return_statement) is ast.Return
-                assign_statement = ast.Assign([ast.Name('__return_value__')],
-                                              return_statement.value if
-                                              type(return_statement.value) in
-                                              (ast.Name, ast.Constant, ast.Tuple) else
-                                              ast.Constant(return_statement.value),
-                                              lineno=0)
-                return block.tree[:-1] + [assign_statement]
+                return block.tree[:-1] + [
+                    ast.Assign(
+                        [ast.Name("__return_value__")],
+                        block.tree[-1].value,
+                        lineno=0,
+                    )
+                ]
             elif block.fallthrough:
                 return block.tree
             else:
