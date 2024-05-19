@@ -4,7 +4,7 @@ import textwrap
 from typing import Callable, Any
 from unittest import main, TestCase
 
-from numba_rvsdg.core.datastructures.ast_transforms import AST2SCFGTransformer
+from numba_rvsdg.core.datastructures.ast_transforms import AST2SCFGTransformer, SCFG2ASTTransformer
 
 
 class TestAST2SCFGTransformer(TestCase):
@@ -15,12 +15,23 @@ class TestAST2SCFGTransformer(TestCase):
         expected: dict[str, dict[str, Any]],
         unreachable: set[int] = set(),
         empty: set[int] = set(),
+        arguments: list[any] = [],
     ):
-        transformer = AST2SCFGTransformer(function)
-        astcfg = transformer.transform_to_ASTCFG()
+        ast2scfg_transformer = AST2SCFGTransformer(function)
+        astcfg = ast2scfg_transformer.transform_to_ASTCFG()
         self.assertEqual(expected, astcfg.to_dict())
         self.assertEqual(unreachable, {i.name for i in astcfg.unreachable})
         self.assertEqual(empty, {i.name for i in astcfg.empty})
+        scfg = astcfg.to_SCFG()
+        scfg.restructure()
+        scfg2ast = SCFG2ASTTransformer()
+        original = ast2scfg_transformer.tree[0]
+        transformerd_ast = scfg2ast.transform(original=original, scfg=scfg)
+        exec_locals = {}
+        exec(ast.unparse(transformerd_ast), {}, exec_locals)
+        transformed_function = exec_locals['transformed_function']
+        for a in arguments:
+            assert function(*a) == transformed_function(*a)
 
     def setUp(self):
         self.maxDiff = None

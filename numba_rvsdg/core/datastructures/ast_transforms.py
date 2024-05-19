@@ -670,6 +670,7 @@ class SCFG2ASTTransformer:
     ) -> ast.FunctionDef:
         body: list[ast.AST] = []
         self.region_stack = [scfg.region]
+        body = []
         for name, block in scfg.concealed_region_view.items():
             if type(block) is RegionBlock and block.kind == 'branch':
                 continue
@@ -711,27 +712,28 @@ class SCFG2ASTTransformer:
                 body = self.codegen(self.lookup(block.jump_targets[0]))
                 orelse = self.codegen(self.lookup(block.jump_targets[1]))
                 if_node = ast.If(test, body, orelse)
-                return [block.tree[:-1]] + [if_node]
+                return block.tree[:-1] + [if_node]
             elif block.fallthrough or block.is_exiting:
                 return block.tree
             else:
                 raise NotImplementedError
         elif type(block) is RegionBlock:
             self.region_stack.append(block)
-            if block.kind == "head":
-                rval = []
-                for b in block.subregion.concealed_region_view.values():
-                    rval.extend(self.codegen(b))
-            elif block.kind == "tail":
-                rval = self.codegen(block.subregion[block.header])
-            elif block.kind == "branch":
-                rval = [self.codegen(b) for b in
+
+            def codegen_view():
+                return [self.codegen(b) for b in
                         block.subregion.concealed_region_view.values() if not
                         (type(b) is RegionBlock and b.kind == "branch")]
+
+            if block.kind == "head":
+                rval = codegen_view()
+            elif block.kind == "tail":
+                rval = codegen_view()
+            elif block.kind == "branch":
+                rval = codegen_view()
             elif block.kind == "loop":
                 rval = [ast.While(test=ast.Constant(value=True),
-                        body=self.codegen(block.subregion[block.header])
-                        + self.codegen(block.subregion[block.exiting]),
+                        body=codegen_view(),
                         orelse=[])]
             else:
                 raise NotImplementedError
