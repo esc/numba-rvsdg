@@ -754,9 +754,9 @@ class SCFG2ASTTransformer:
             return [ast.Assign([ast.Name(t)], ast.Constant(v), lineno=0)
                     for t, v in block.variable_assignment.items()]
         elif type(block) is SyntheticTail:
-                pass
+            pass
         elif type(block) is SyntheticFill:
-                return [ast.Pass()]
+            return [ast.Pass()]
         elif type(block) is SyntheticExitBranch:
             assert len(block.jump_targets) == 2
             assert len(block.backedges) == 0
