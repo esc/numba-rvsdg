@@ -705,7 +705,7 @@ class SCFG2ASTTransformer:
         print(type(block), block.name)
         if type(block) is PythonASTBlock:
             if len(block.jump_targets) == 2:
-                if type(block.tree[-1]) is ast.Name:
+                if type(block.tree[-1]) in (ast.Name, ast.Compare):
                     test = block.tree[-1]
                 else:
                     test = block.tree[-1].value
