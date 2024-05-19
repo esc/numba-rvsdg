@@ -672,7 +672,7 @@ class SCFG2ASTTransformer:
         self.region_stack = [scfg.region]
         body = []
         for name, block in scfg.concealed_region_view.items():
-            if type(block) is RegionBlock and block.kind == 'branch':
+            if type(block) is RegionBlock and block.kind == "branch":
                 continue
             body.extend(self.codegen(block))
         fdef = ast.FunctionDef(
@@ -721,9 +721,11 @@ class SCFG2ASTTransformer:
             self.region_stack.append(block)
 
             def codegen_view():
-                return [self.codegen(b) for b in
-                        block.subregion.concealed_region_view.values() if not
-                        (type(b) is RegionBlock and b.kind == "branch")]
+                return [
+                    self.codegen(b)
+                    for b in block.subregion.concealed_region_view.values()
+                    if not (type(b) is RegionBlock and b.kind == "branch")
+                ]
 
             if block.kind == "head":
                 rval = codegen_view()
@@ -732,16 +734,22 @@ class SCFG2ASTTransformer:
             elif block.kind == "branch":
                 rval = codegen_view()
             elif block.kind == "loop":
-                rval = [ast.While(test=ast.Constant(value=True),
+                rval = [
+                    ast.While(
+                        test=ast.Constant(value=True),
                         body=codegen_view(),
-                        orelse=[])]
+                        orelse=[],
+                    )
+                ]
             else:
                 raise NotImplementedError
             self.region_stack.pop()
             return rval
         elif type(block) is SyntheticAssignment:
-            return [ast.Assign([ast.Name(t)], ast.Constant(v), lineno=0)
-                    for t, v in block.variable_assignment.items()]
+            return [
+                ast.Assign([ast.Name(t)], ast.Constant(v), lineno=0)
+                for t, v in block.variable_assignment.items()
+            ]
         elif type(block) is SyntheticTail:
             pass
         elif type(block) is SyntheticFill:

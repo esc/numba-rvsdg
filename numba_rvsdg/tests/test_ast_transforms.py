@@ -4,7 +4,10 @@ import textwrap
 from typing import Callable, Any
 from unittest import main, TestCase
 
-from numba_rvsdg.core.datastructures.ast_transforms import AST2SCFGTransformer, SCFG2ASTTransformer
+from numba_rvsdg.core.datastructures.ast_transforms import (
+    AST2SCFGTransformer,
+    SCFG2ASTTransformer,
+)
 
 
 class TestAST2SCFGTransformer(TestCase):
@@ -32,7 +35,7 @@ class TestAST2SCFGTransformer(TestCase):
         transformerd_ast = scfg2ast.transform(original=original, scfg=scfg)
         exec_locals = {}
         exec(ast.unparse(transformerd_ast), {}, exec_locals)
-        transformed_function = exec_locals['transformed_function']
+        transformed_function = exec_locals["transformed_function"]
         for a in arguments:
             assert function(*a) == transformed_function(*a)
 
