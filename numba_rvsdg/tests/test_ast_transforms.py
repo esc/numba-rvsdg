@@ -180,7 +180,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "2",
             },
         }
-        self.compare(function, expected, unreachable={"3"})
+        self.compare(function, expected, unreachable={"3"}, arguments=[(9,), (10,)])
 
     def test_if_else_assign(self):
         def function(x: int) -> int:
@@ -212,7 +212,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "3",
             },
         }
-        self.compare(function, expected)
+        self.compare(function, expected, arguments=[(9,), (10,)])
 
     def test_nested_if(self):
         def function(x: int, y: int) -> int:

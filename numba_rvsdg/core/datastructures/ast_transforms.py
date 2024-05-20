@@ -714,7 +714,7 @@ class SCFG2ASTTransformer:
                 orelse = self.codegen(self.lookup(block.jump_targets[1]))
                 if_node = ast.If(test, body, orelse)
                 return block.tree[:-1] + [if_node]
-            elif type(block.tree[-1]) is ast.Return:
+            elif block.fallthrough and type(block.tree[-1]) is ast.Return:
                 # The value of the ast.Return could be either None or an
                 # ast.AST type. In the case of None, this refers to a plain
                 # 'return', which is implicitly 'return None'. So, if it is
@@ -728,7 +728,7 @@ class SCFG2ASTTransformer:
                         lineno=0,
                     )
                 ]
-            elif block.fallthrough:
+            elif block.fallthrough or block.is_exiting:
                 return block.tree
             else:
                 raise NotImplementedError
