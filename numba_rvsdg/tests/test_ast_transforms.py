@@ -270,7 +270,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "8",
             },
         }
-        self.compare(function, expected, empty={"6", "9"})
+        self.compare(function, expected, empty={"6", "9"}, arguments=[(9, 4), (9, 5), (10, 14), (10, 15)])
 
     def test_nested_if_with_empty_else_and_return(self):
         def function(x: int, y: int) -> None:
