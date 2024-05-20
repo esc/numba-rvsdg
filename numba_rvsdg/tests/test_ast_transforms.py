@@ -180,7 +180,9 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "2",
             },
         }
-        self.compare(function, expected, unreachable={"3"}, arguments=[(9,), (10,)])
+        self.compare(
+            function, expected, unreachable={"3"}, arguments=[(9,), (10,)]
+        )
 
     def test_if_else_assign(self):
         def function(x: int) -> int:
@@ -270,7 +272,12 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "8",
             },
         }
-        self.compare(function, expected, empty={"6", "9"}, arguments=[(9, 4), (9, 5), (10, 14), (10, 15)])
+        self.compare(
+            function,
+            expected,
+            empty={"6", "9"},
+            arguments=[(9, 4), (9, 5), (10, 14), (10, 15)],
+        )
 
     def test_nested_if_with_empty_else_and_return(self):
         def function(x: int, y: int) -> None:
