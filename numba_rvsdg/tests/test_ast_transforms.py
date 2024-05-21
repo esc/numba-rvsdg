@@ -3,6 +3,12 @@ import ast
 import textwrap
 from typing import Callable, Any
 from unittest import main, TestCase
+import trace
+import tempfile
+import os.path
+import sys
+import shutil
+import importlib
 
 from numba_rvsdg.core.datastructures.ast_transforms import (
     AST2SCFGTransformer,
@@ -26,18 +32,56 @@ class TestAST2SCFGTransformer(TestCase):
         self.assertEqual(expected, astcfg.to_dict())
         self.assertEqual(unreachable, {i.name for i in astcfg.unreachable})
         self.assertEqual(empty, {i.name for i in astcfg.empty})
-        # Then restructure, synthesieze python and run origanl and transformed
+        # Then restructure, synthesieze python and run original and transformed
         # on the same arguments and assert they are the same.
         scfg = astcfg.to_SCFG()
         scfg.restructure()
         scfg2ast = SCFG2ASTTransformer()
-        original = ast2scfg_transformer.tree[0]
-        transformerd_ast = scfg2ast.transform(original=original, scfg=scfg)
+        original_ast = ast2scfg_transformer.tree[0]
+        transformed_ast = scfg2ast.transform(original=original_ast, scfg=scfg)
         exec_locals = {}
-        exec(ast.unparse(transformerd_ast), {}, exec_locals)
-        transformed_function = exec_locals["transformed_function"]
-        for a in arguments:
-            assert function(*a) == transformed_function(*a)
+        #exec(ast.unparse(transformerd_ast), {}, exec_locals)
+        #transformed_function = exec_locals["transformed_function"]
+
+        importlib.invalidate_caches()
+
+        td = tempfile.mkdtemp()
+        sys.path.append(td)
+
+        with open(os.path.join(td, "original.py"), "w") as f:
+            f.write(ast.unparse(original_ast))
+        with open(os.path.join(td, "transformed.py"), "w") as f:
+            f.write(ast.unparse(transformed_ast))
+
+        exec("from original import function as temp_og", {}, exec_locals)
+        temporary_function = exec_locals["temp_og"]
+
+        exec("from transformed import transformed_function as temp_tf", {}, exec_locals)
+        temporary_transformed_function = exec_locals["temp_tf"]
+
+        original_tracer = trace.Trace(trace=0, count=1)
+        transformed_tracer = trace.Trace(trace=0, count=1)
+        if arguments:
+            for a in arguments:
+                assert original_tracer.runfunc(temporary_function, *a) == transformed_tracer.runfunc(temporary_transformed_function, *a)
+        else:
+            assert original_tracer.runfunc(temporary_function) == transformed_tracer.runfunc(temporary_transformed_function)
+        original_traced_lines = sorted([k[1] for k in original_tracer.results().counts.keys()])
+        original_source = ast.unparse(original_ast).splitlines()
+        assert [i+1 for i, l in enumerate(original_source) if not l.startswith("def") and "else:" not in l] == original_traced_lines
+
+        transformed_traced_lines = sorted([k[1] for k in transformed_tracer.results().counts.keys()])
+        transformed_source = ast.unparse(transformed_ast).splitlines()
+        assert [i+1 for i, l in enumerate(transformed_source) if not l.startswith("def") and "else:" not in l] == transformed_traced_lines
+
+        del temporary_function
+        del temporary_transformed_function
+
+        popped_td = sys.path.pop()
+        assert td == popped_td
+
+        shutil.rmtree(td)
+
 
     def setUp(self):
         self.maxDiff = None
@@ -900,7 +944,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "6",
             },
         }
-        self.compare(function, expected, empty={"7"})
+        self.compare(function, expected, empty={"7"}, arguments=[(0,), (1,)])
 
     def test_for_with_nested_for_else(self):
         def function(a: bool) -> int:

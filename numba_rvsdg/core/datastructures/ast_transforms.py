@@ -853,13 +853,26 @@ def SCFG2AST(scfg: SCFG) -> ast.FunctionDef:  # type: ignore
 
 if __name__ == "__main__":
 
-    def function(a: bool) -> int:
-        c = 0
-        for i in range(10):
-            c += 1
-            if a:
-                break
-        return c
+    # def function(a: bool) -> int:
+    #    c = 0
+    #    for i in range(10):
+    #        c += 1
+    #        if a:
+    #            break
+    #    return c
+    def function(x: int, y: int) -> None:
+        y << 2
+        if x < 10:
+            y << 2
+            if y < 5:
+                y = 1
+        else:
+            if y < 15:
+                y = 2
+            else:
+                return 4
+            y += 1
+        return y
 
     scfg = AST2SCFG(function)
     scfg.restructure()
