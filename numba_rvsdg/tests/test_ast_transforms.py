@@ -349,26 +349,30 @@ class TestAST2SCFGTransformer(TestCase):
         )
 
     def test_elif(self):
-        def function(x: int, a: int, b: int) -> int:
-            if x < 10:
-                return
-            elif x < 15:
-                y = b - a
-            elif x < 20:
-                y = a**2
+        def function(x: int) -> int:
+            if x < 1:
+                return 10
+            elif x < 2:
+                y = 20
+            elif x < 3:
+                y = 30
             else:
-                y = a - b
+                y = 40
             return y
 
         expected = {
             "0": {
-                "instructions": ["x < 10"],
+                "instructions": ["x < 1"],
                 "jump_targets": ["1", "2"],
                 "name": "0",
             },
-            "1": {"instructions": ["return"], "jump_targets": [], "name": "1"},
+            "1": {
+                "instructions": ["return 10"],
+                "jump_targets": [],
+                "name": "1",
+            },
             "2": {
-                "instructions": ["x < 15"],
+                "instructions": ["x < 2"],
                 "jump_targets": ["4", "5"],
                 "name": "2",
             },
@@ -378,27 +382,37 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "3",
             },
             "4": {
-                "instructions": ["y = b - a"],
+                "instructions": ["y = 20"],
                 "jump_targets": ["3"],
                 "name": "4",
             },
             "5": {
-                "instructions": ["x < 20"],
+                "instructions": ["x < 3"],
                 "jump_targets": ["7", "8"],
                 "name": "5",
             },
             "7": {
-                "instructions": ["y = a ** 2"],
+                "instructions": ["y = 30"],
                 "jump_targets": ["3"],
                 "name": "7",
             },
             "8": {
-                "instructions": ["y = a - b"],
+                "instructions": ["y = 40"],
                 "jump_targets": ["3"],
                 "name": "8",
             },
         }
-        self.compare(function, expected, empty={"9", "6"})
+        self.compare(
+            function,
+            expected,
+            empty={"9", "6"},
+            arguments=[
+                (0,),
+                (1,),
+                (2,),
+                (3,),
+            ],
+        )
 
     def test_simple_while(self):
         def function() -> int:
