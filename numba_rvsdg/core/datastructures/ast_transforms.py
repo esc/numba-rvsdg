@@ -3,11 +3,13 @@ import inspect
 from typing import Callable, Any, MutableMapping
 import textwrap
 from dataclasses import dataclass
+from collections import defaultdict
 
 from numba_rvsdg.core.datastructures.scfg import SCFG
 from numba_rvsdg.core.datastructures.basic_block import (
     PythonASTBlock,
     RegionBlock,
+    SyntheticHead,
     SyntheticTail,
     SyntheticFill,
     SyntheticReturn,
@@ -671,6 +673,7 @@ class SCFG2ASTTransformer:
     ) -> ast.FunctionDef:
         body: list[ast.AST] = []
         self.region_stack = [scfg.region]
+        self.scfg = scfg
         body = []
         for name, block in scfg.concealed_region_view.items():
             if type(block) is RegionBlock and block.kind == "branch":
@@ -811,6 +814,49 @@ class SCFG2ASTTransformer:
                 orelse=[ast.Break()],
             )
             return [if_break_node]
+        elif type(block) is SyntheticHead:
+            # Create a reverse lookup from the branch_value_table
+            # branch_name --> list of variables that lead there
+            reverse = defaultdict(list)
+            for (
+                variable_value,
+                jump_target,
+            ) in block.branch_value_table.items():
+                reverse[jump_target].append(variable_value)
+            # recursive generation of if-cascade
+
+            def if_cascade(jump_targets):
+                if len(jump_targets) == 1:
+                    # base case, final else
+                    return self.codegen(self.lookup(jump_targets.pop()))
+                else:
+                    # otherwise generate if statement for current jump_target
+                    current = jump_targets.pop()
+                    # compare to all variable values that point to this
+                    # jump_target
+                    if_test = ast.Compare(
+                        left=ast.Name(block.variable),
+                        ops=[ast.In()],
+                        comparators=[
+                            ast.Tuple(
+                                elts=[
+                                    ast.Constant(i) for i in reverse[current]
+                                ],
+                                ctx=ast.Load(),
+                            )
+                        ],
+                    )
+                    # Create the the if-statement itself, using the test. Do
+                    # code-gen for the block that the is being pointed to and
+                    # recurse for the rest of the jump_targets.
+                    if_node = ast.If(
+                        test=if_test,
+                        body=self.codegen(self.lookup(current)),
+                        orelse=if_cascade(jump_targets),
+                    )
+                    return [if_node]
+
+            return if_cascade(list(block.jump_targets[::-1]))
         else:
             raise NotImplementedError
         return []

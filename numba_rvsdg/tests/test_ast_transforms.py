@@ -283,14 +283,14 @@ class TestAST2SCFGTransformer(TestCase):
         def function(x: int, y: int) -> None:
             y << 2
             if x < 10:
-                y -= 1
+                y << 2
                 if y < 5:
                     y = 1
             else:
                 if y < 15:
                     y = 2
                 else:
-                    return
+                    return 4
                 y += 1
             return y
 
@@ -301,7 +301,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "0",
             },
             "1": {
-                "instructions": ["y -= 1", "y < 5"],
+                "instructions": ["y << 2", "y < 5"],
                 "jump_targets": ["4", "3"],
                 "name": "1",
             },
@@ -325,14 +325,28 @@ class TestAST2SCFGTransformer(TestCase):
                 "jump_targets": ["9"],
                 "name": "7",
             },
-            "8": {"instructions": ["return"], "jump_targets": [], "name": "8"},
+            "8": {
+                "instructions": ["return 4"],
+                "jump_targets": [],
+                "name": "8",
+            },
             "9": {
                 "instructions": ["y += 1"],
                 "jump_targets": ["3"],
                 "name": "9",
             },
         }
-        self.compare(function, expected, empty={"5", "6"})
+        self.compare(
+            function,
+            expected,
+            empty={"5", "6"},
+            arguments=[
+                (9, 4),
+                (9, 5),
+                (10, 14),
+                (10, 15),
+            ],
+        )
 
     def test_elif(self):
         def function(x: int, a: int, b: int) -> int:
