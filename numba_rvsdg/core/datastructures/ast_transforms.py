@@ -774,27 +774,6 @@ class SCFG2ASTTransformer:
             return [ast.Pass()]
         elif type(block) is SyntheticReturn:
             return [ast.Return(ast.Name("__return_value__"))]
-        elif type(block) is SyntheticExitBranch:
-            assert len(block.jump_targets) == 2
-            assert len(block.backedges) == 0
-            compare_value = [
-                i
-                for i, v in block.branch_value_table.items()
-                if v == block.jump_targets[0]
-            ][0]
-            if_beak_node_test = ast.Compare(
-                left=ast.Name(block.variable),
-                ops=[ast.Eq()],
-                comparators=[ast.Constant(compare_value)],
-            )
-            body = self.codegen(self.lookup(block.jump_targets[0]))
-            orelse = self.codegen(self.lookup(block.jump_targets[1]))
-            if_break_node = ast.If(
-                test=if_beak_node_test,
-                body=body,
-                orelse=orelse,
-            )
-            return [if_break_node]
         elif type(block) is SyntheticExitingLatch:
             assert len(block.jump_targets) == 1
             assert len(block.backedges) == 1
@@ -814,7 +793,7 @@ class SCFG2ASTTransformer:
                 orelse=[ast.Break()],
             )
             return [if_break_node]
-        elif type(block) is SyntheticHead:
+        elif type(block) in (SyntheticExitBranch, SyntheticHead):
             # Create a reverse lookup from the branch_value_table
             # branch_name --> list of variables that lead there
             reverse = defaultdict(list)
