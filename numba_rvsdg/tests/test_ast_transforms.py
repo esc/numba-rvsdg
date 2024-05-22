@@ -656,8 +656,10 @@ class TestAST2SCFGTransformer(TestCase):
             },
         }
         self.compare(
-            function, expected, empty={"1", "2", "6", "7", "10", "11"},
-            arguments=[(0, ), (1, )]
+            function,
+            expected,
+            empty={"1", "2", "6", "7", "10", "11"},
+            arguments=[(0,), (1,)],
         )
 
     def test_while_break_continue(self):
