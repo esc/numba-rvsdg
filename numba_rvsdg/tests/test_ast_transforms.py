@@ -984,11 +984,11 @@ class TestAST2SCFGTransformer(TestCase):
         self.compare(function, expected, empty={"7"}, arguments=[(0,), (1,)])
 
     def test_for_with_nested_for_else(self):
-        def function(a: bool) -> int:
+        def function(a: int) -> int:
             c = 1
             for i in range(1):
                 for j in range(1):
-                    if a:
+                    if a == 0:
                         c *= 3
                         break  # This break decides, if True skip continue.
                 else:
@@ -1000,8 +1000,8 @@ class TestAST2SCFGTransformer(TestCase):
                 c *= 9  # Not breaking in inner loop leads here
             return c
 
-        self.assertEqual(function(True), 3 * 7)
-        self.assertEqual(function(False), 5 * 9)
+        self.assertEqual(function(1), 5 * 9)
+        self.assertEqual(function(0), 3 * 7)
         expected = {
             "0": {
                 "instructions": [
@@ -1049,7 +1049,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "5",
             },
             "6": {
-                "instructions": ["a"],
+                "instructions": ["a == 0"],
                 "jump_targets": ["9", "5"],
                 "name": "6",
             },
@@ -1070,7 +1070,9 @@ class TestAST2SCFGTransformer(TestCase):
             },
         }
 
-        self.compare(function, expected, empty={"11", "10"})
+        self.compare(
+            function, expected, empty={"11", "10"}, arguments=[(0,), (1,)]
+        )
 
     def test_for_with_nested_else_return_break_and_continue(self):
         def function(a: int, b: int, c: int, d: int, e: int, f: int) -> int:
