@@ -41,22 +41,25 @@ class TestAST2SCFGTransformer(TestCase):
         original_ast = ast2scfg_transformer.tree[0]
         transformed_ast = scfg2ast.transform(original=original_ast, scfg=scfg)
 
-        # Create temporary directory to store code and append to PYTHONPATH.
-        td = tempfile.mkdtemp()
-        sys.path.append(td)
-
         # Save original in empty file and use importlib tricks to import from
         # there.
-        with open(os.path.join(td, "original_module.py"), "w") as f:
+        with open(
+            os.path.join(self.temporary_directory, "original_module.py"), "w"
+        ) as f:
             f.write(ast.unparse(original_ast))
         import original_module
+
         importlib.reload(original_module)
         temporary_function = original_module.function
 
         # Save transformed like this too.
-        with open(os.path.join(td, "transformed_module.py"), "w") as f:
+        with open(
+            os.path.join(self.temporary_directory, "transformed_module.py"),
+            "w",
+        ) as f:
             f.write(ast.unparse(transformed_ast))
         import transformed_module
+
         importlib.reload(transformed_module)
         temporary_transformed_function = (
             transformed_module.transformed_function
@@ -101,17 +104,21 @@ class TestAST2SCFGTransformer(TestCase):
             if not l.startswith("def") and "else:" not in l
         ] == transformed_traced_lines
 
-        # Cleanup both temporary functions, invalidate importlib caches, remove
-        # the temporary directory from the PYTHONPATH and then delete it.
-        del temporary_function
-        del temporary_transformed_function
-        importlib.invalidate_caches()
-        popped_td = sys.path.pop()
-        assert td == popped_td
-        shutil.rmtree(td)
-
     def setUp(self):
+        # Enable pytest verbose output.
         self.maxDiff = None
+        # Create temporary directory to store code and append to PYTHONPATH.
+        self.temporary_directory = tempfile.mkdtemp()
+        sys.path.append(self.temporary_directory)
+
+    def tearDown(self):
+        # Invalidate importlib caches.
+        importlib.invalidate_caches()
+        # Remove the temporary directory from the PYTHONPATH and check that
+        # the correct path was removed.
+        assert sys.path.pop() == self.temporary_directory
+        # Finally remove the temporary directory again.
+        shutil.rmtree(self.temporary_directory)
 
     def test_solo_return(self):
         def function() -> int:
