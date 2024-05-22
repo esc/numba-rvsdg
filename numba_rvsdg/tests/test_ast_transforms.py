@@ -922,7 +922,13 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "8",
             },
         }
-        self.compare(function, expected, unreachable={"7", "10"}, empty={"9"})
+        self.compare(
+            function,
+            expected,
+            unreachable={"7", "10"},
+            empty={"9"},
+            arguments=[(0, 0), (2, 0), (2, 2)],
+        )
 
     def test_for_with_if_in_else(self):
         def function(a: int):
