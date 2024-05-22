@@ -38,7 +38,7 @@ class TestAST2SCFGTransformer(TestCase):
         scfg = astcfg.to_SCFG()
         scfg.restructure()
         scfg2ast = SCFG2ASTTransformer()
-        original_ast = ast2scfg_transformer.tree[0]
+        original_ast = AST2SCFGTransformer.unparse_code(function)[0]
         transformed_ast = scfg2ast.transform(original=original_ast, scfg=scfg)
 
         # Save original in empty file and use importlib tricks to import from
@@ -613,9 +613,9 @@ class TestAST2SCFGTransformer(TestCase):
         self.compare(function, expected, empty={"4", "7"})
 
     def test_while_in_if(self):
-        def function(a: bool) -> int:
+        def function(a: int) -> int:
             x = 0
-            if a is True:
+            if a == 0:
                 while x < 10:
                     x += 2
             else:
@@ -625,7 +625,7 @@ class TestAST2SCFGTransformer(TestCase):
 
         expected = {
             "0": {
-                "instructions": ["x = 0", "a is True"],
+                "instructions": ["x = 0", "a == 0"],
                 "jump_targets": ["4", "8"],
                 "name": "0",
             },
@@ -656,7 +656,8 @@ class TestAST2SCFGTransformer(TestCase):
             },
         }
         self.compare(
-            function, expected, empty={"1", "2", "6", "7", "10", "11"}
+            function, expected, empty={"1", "2", "6", "7", "10", "11"},
+            arguments=[(0, ), (1, )]
         )
 
     def test_while_break_continue(self):
