@@ -674,7 +674,6 @@ class SCFG2ASTTransformer:
         body: list[ast.AST] = []
         self.region_stack = [scfg.region]
         self.scfg = scfg
-        body = []
         for name, block in scfg.concealed_region_view.items():
             if type(block) is RegionBlock and block.kind == "branch":
                 continue
