@@ -26,62 +26,89 @@ class TestAST2SCFGTransformer(TestCase):
         empty: set[int] = set(),
         arguments: list[any] = [],
     ):
-        # Girst test against the expected CFG...
+        # First, test against the expected CFG...
         ast2scfg_transformer = AST2SCFGTransformer(function)
         astcfg = ast2scfg_transformer.transform_to_ASTCFG()
         self.assertEqual(expected, astcfg.to_dict())
         self.assertEqual(unreachable, {i.name for i in astcfg.unreachable})
         self.assertEqual(empty, {i.name for i in astcfg.empty})
-        # Then restructure, synthesieze python and run original and transformed
+
+        # Then restructure, synthesize python and run original and transformed
         # on the same arguments and assert they are the same.
         scfg = astcfg.to_SCFG()
         scfg.restructure()
         scfg2ast = SCFG2ASTTransformer()
         original_ast = ast2scfg_transformer.tree[0]
         transformed_ast = scfg2ast.transform(original=original_ast, scfg=scfg)
-        exec_locals = {}
-        #exec(ast.unparse(transformerd_ast), {}, exec_locals)
-        #transformed_function = exec_locals["transformed_function"]
 
-        importlib.invalidate_caches()
-
+        # Create temporary directory to store code and append to PYTHONPATH.
         td = tempfile.mkdtemp()
         sys.path.append(td)
 
-        with open(os.path.join(td, "original.py"), "w") as f:
+        # Save original in empty file and use importlib tricks to import from
+        # there.
+        with open(os.path.join(td, "original_module.py"), "w") as f:
             f.write(ast.unparse(original_ast))
-        with open(os.path.join(td, "transformed.py"), "w") as f:
+        import original_module
+        importlib.reload(original_module)
+        temporary_function = original_module.function
+
+        # Save transformed like this too.
+        with open(os.path.join(td, "transformed_module.py"), "w") as f:
             f.write(ast.unparse(transformed_ast))
+        import transformed_module
+        importlib.reload(transformed_module)
+        temporary_transformed_function = (
+            transformed_module.transformed_function
+        )
 
-        exec("from original import function as temp_og", {}, exec_locals)
-        temporary_function = exec_locals["temp_og"]
-
-        exec("from transformed import transformed_function as temp_tf", {}, exec_locals)
-        temporary_transformed_function = exec_locals["temp_tf"]
-
+        # Setup tracers and run functions based on arguments, compare results
+        # of runs with same arguments to ensure original and transformed behave
+        # the same.
         original_tracer = trace.Trace(trace=0, count=1)
         transformed_tracer = trace.Trace(trace=0, count=1)
         if arguments:
             for a in arguments:
-                assert original_tracer.runfunc(temporary_function, *a) == transformed_tracer.runfunc(temporary_transformed_function, *a)
+                assert original_tracer.runfunc(
+                    temporary_function, *a
+                ) == transformed_tracer.runfunc(
+                    temporary_transformed_function, *a
+                )
         else:
-            assert original_tracer.runfunc(temporary_function) == transformed_tracer.runfunc(temporary_transformed_function)
-        original_traced_lines = sorted([k[1] for k in original_tracer.results().counts.keys()])
+            assert original_tracer.runfunc(
+                temporary_function
+            ) == transformed_tracer.runfunc(temporary_transformed_function)
+
+        # Make sure everything in the original was traced.
+        original_traced_lines = sorted(
+            [k[1] for k in original_tracer.results().counts.keys()]
+        )
         original_source = ast.unparse(original_ast).splitlines()
-        assert [i+1 for i, l in enumerate(original_source) if not l.startswith("def") and "else:" not in l] == original_traced_lines
+        assert [
+            i + 1
+            for i, l in enumerate(original_source)
+            if not l.startswith("def") and "else:" not in l
+        ] == original_traced_lines
 
-        transformed_traced_lines = sorted([k[1] for k in transformed_tracer.results().counts.keys()])
+        # Make sure everything in the transformed was traced.
+        transformed_traced_lines = sorted(
+            [k[1] for k in transformed_tracer.results().counts.keys()]
+        )
         transformed_source = ast.unparse(transformed_ast).splitlines()
-        assert [i+1 for i, l in enumerate(transformed_source) if not l.startswith("def") and "else:" not in l] == transformed_traced_lines
+        assert [
+            i + 1
+            for i, l in enumerate(transformed_source)
+            if not l.startswith("def") and "else:" not in l
+        ] == transformed_traced_lines
 
+        # Cleanup both temporary functions, invalidate importlib caches, remove
+        # the temporary directory from the PYTHONPATH and then delete it.
         del temporary_function
         del temporary_transformed_function
-
+        importlib.invalidate_caches()
         popped_td = sys.path.pop()
         assert td == popped_td
-
         shutil.rmtree(td)
-
 
     def setUp(self):
         self.maxDiff = None
