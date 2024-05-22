@@ -663,51 +663,56 @@ class TestAST2SCFGTransformer(TestCase):
         )
 
     def test_while_break_continue(self):
-        def function() -> int:
-            x = 0
-            while x < 10:
-                x += 1
-                if x % 2 == 0:
+        def function(x: int) -> int:
+            y = 0
+            while y < 10:
+                y += 1
+                if x == 0:
                     continue
-                elif x == 9:
+                elif x == 1:
                     break
                 else:
-                    x += 1
-            return x
+                    y += 10
+            return y
 
         expected = {
             "0": {
-                "instructions": ["x = 0"],
+                "instructions": ["y = 0"],
                 "jump_targets": ["1"],
                 "name": "0",
             },
             "1": {
-                "instructions": ["x < 10"],
+                "instructions": ["y < 10"],
                 "jump_targets": ["2", "3"],
                 "name": "1",
             },
             "2": {
-                "instructions": ["x += 1", "x % 2 == 0"],
+                "instructions": ["y += 1", "x == 0"],
                 "jump_targets": ["1", "6"],
                 "name": "2",
             },
             "3": {
-                "instructions": ["return x"],
+                "instructions": ["return y"],
                 "jump_targets": [],
                 "name": "3",
             },
             "6": {
-                "instructions": ["x == 9"],
+                "instructions": ["x == 1"],
                 "jump_targets": ["3", "9"],
                 "name": "6",
             },
             "9": {
-                "instructions": ["x += 1"],
+                "instructions": ["y += 10"],
                 "jump_targets": ["1"],
                 "name": "9",
             },
         }
-        self.compare(function, expected, empty={"4", "5", "7", "8", "10"})
+        self.compare(
+            function,
+            expected,
+            empty={"4", "5", "7", "8", "10"},
+            arguments=[(0,), (1,), (2,)],
+        )
 
     def test_while_else(self):
         def function() -> int:
