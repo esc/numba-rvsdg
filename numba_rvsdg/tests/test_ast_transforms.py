@@ -1086,31 +1086,31 @@ class TestAST2SCFGTransformer(TestCase):
         )
 
     def test_for_with_nested_else_return_break_and_continue(self):
-        def function(a: int, b: int, c: int, d: int, e: int, f: int) -> int:
+        def function(a: int) -> int:
             for i in range(2):
-                if i == a:
-                    i = 3
+                if a == 1:
+                    i += 1
                     return i
-                elif i == b:
-                    i = 4
+                elif a == 2:
+                    i += 2
                     break
-                elif i == c:
-                    i = 5
+                elif a == 3:
+                    i += 3
                     continue
                 else:
                     while i < 10:
                         i += 1
-                        if i == d:
-                            i = 3
+                        if a == 4:
+                            i += 4
                             return i
-                        elif i == e:
-                            i = 4
+                        elif a == 5:
+                            i += 5
                             break
-                        elif i == f:
-                            i = 5
+                        elif a == 6:
+                            i += 6
                             continue
                         else:
-                            i += 1
+                            i += 7
             return i
 
         expected = {
@@ -1132,7 +1132,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "1",
             },
             "11": {
-                "instructions": ["i = 5"],
+                "instructions": ["i += 3"],
                 "jump_targets": ["1"],
                 "name": "11",
             },
@@ -1142,42 +1142,42 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "14",
             },
             "15": {
-                "instructions": ["i += 1", "i == d"],
+                "instructions": ["i += 1", "a == 4"],
                 "jump_targets": ["18", "19"],
                 "name": "15",
             },
             "18": {
-                "instructions": ["i = 3", "return i"],
+                "instructions": ["i += 4", "return i"],
                 "jump_targets": [],
                 "name": "18",
             },
             "19": {
-                "instructions": ["i == e"],
+                "instructions": ["a == 5"],
                 "jump_targets": ["21", "22"],
                 "name": "19",
             },
             "2": {
-                "instructions": ["i == a"],
+                "instructions": ["a == 1"],
                 "jump_targets": ["5", "6"],
                 "name": "2",
             },
             "21": {
-                "instructions": ["i = 4"],
+                "instructions": ["i += 5"],
                 "jump_targets": ["1"],
                 "name": "21",
             },
             "22": {
-                "instructions": ["i == f"],
+                "instructions": ["a == 6"],
                 "jump_targets": ["24", "25"],
                 "name": "22",
             },
             "24": {
-                "instructions": ["i = 5"],
+                "instructions": ["i += 6"],
                 "jump_targets": ["14"],
                 "name": "24",
             },
             "25": {
-                "instructions": ["i += 1"],
+                "instructions": ["i += 7"],
                 "jump_targets": ["14"],
                 "name": "25",
             },
@@ -1192,28 +1192,34 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "4",
             },
             "5": {
-                "instructions": ["i = 3", "return i"],
+                "instructions": ["i += 1", "return i"],
                 "jump_targets": [],
                 "name": "5",
             },
             "6": {
-                "instructions": ["i == b"],
+                "instructions": ["a == 2"],
                 "jump_targets": ["8", "9"],
                 "name": "6",
             },
             "8": {
-                "instructions": ["i = 4"],
+                "instructions": ["i += 2"],
                 "jump_targets": ["4"],
                 "name": "8",
             },
             "9": {
-                "instructions": ["i == c"],
+                "instructions": ["a == 3"],
                 "jump_targets": ["11", "14"],
                 "name": "9",
             },
         }
         empty = {"7", "10", "12", "13", "16", "17", "20", "23", "26"}
-        self.compare(function, expected, empty=empty)
+        arguments = [(1,), (2,), (3,), (4,), (5,), (6,), (7,)]
+        self.compare(
+            function,
+            expected,
+            empty=empty,
+            arguments=arguments,
+        )
 
 
 if __name__ == "__main__":

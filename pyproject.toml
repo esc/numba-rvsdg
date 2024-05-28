@@ -33,3 +33,8 @@ dev = [
     "pytest",
     "sphinx-rtd-theme"
 ]
+[tool.coverage.report]
+omit = [
+    "**/original_module.py",
+    "**/transformed_module.py",
+    ]
