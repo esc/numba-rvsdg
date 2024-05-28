@@ -4,7 +4,7 @@ all:
 build:
 	python -m pip install -vv -e .
 test:
-	coverage run -m pytest --pyargs numba_rvsdg
+	COVERAGE_CORE=sysmon coverage run -m pytest --pyargs numba_rvsdg
 	coverage report
 lint:
 	pre-commit run --verbose --all-files

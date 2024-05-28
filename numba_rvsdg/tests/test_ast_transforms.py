@@ -3,9 +3,6 @@ import ast
 import textwrap
 from typing import Callable, Any
 from unittest import main, TestCase
-import sys
-import shutil
-import importlib
 from sys import monitoring as sm
 
 from numba_rvsdg.core.datastructures.ast_transforms import (
@@ -96,17 +93,17 @@ class TestAST2SCFGTransformer(TestCase):
         # Check line trace of original
         original_source = ast.unparse(original_ast).splitlines()
         assert [
-           i + 1
-           for i, l in enumerate(original_source)
-           if not l.startswith("def") and "else:" not in l
+            i + 1
+            for i, l in enumerate(original_source)
+            if not l.startswith("def") and "else:" not in l
         ] == sorted(original_callback.lines)
 
         # Check line trace of transformed
         transformed_source = ast.unparse(transformed_ast).splitlines()
         assert [
-           i + 1
-           for i, l in enumerate(transformed_source)
-           if not l.startswith("def") and "else:" not in l
+            i + 1
+            for i, l in enumerate(transformed_source)
+            if not l.startswith("def") and "else:" not in l
         ] == sorted(transformed_callback.lines)
 
     def setUp(self):
