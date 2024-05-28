@@ -3,17 +3,26 @@ import ast
 import textwrap
 from typing import Callable, Any
 from unittest import main, TestCase
-import trace
-import tempfile
-import os.path
 import sys
 import shutil
 import importlib
+from sys import monitoring as sm
 
 from numba_rvsdg.core.datastructures.ast_transforms import (
     AST2SCFGTransformer,
     SCFG2ASTTransformer,
 )
+
+sm.use_tool_id(sm.PROFILER_ID, "custom_tracer")
+
+
+class LineTraceCallback:
+
+    def __init__(self):
+        self.lines = set()
+
+    def __call__(self, code, line):
+        self.lines.add(line)
 
 
 class TestAST2SCFGTransformer(TestCase):
@@ -41,84 +50,68 @@ class TestAST2SCFGTransformer(TestCase):
         original_ast = AST2SCFGTransformer.unparse_code(function)[0]
         transformed_ast = scfg2ast.transform(original=original_ast, scfg=scfg)
 
-        # Save original in empty file and use importlib tricks to import from
-        # there.
-        with open(
-            os.path.join(self.temporary_directory, "original_module.py"), "w"
-        ) as f:
-            f.write(ast.unparse(original_ast))
-        import original_module
+        # use exec to obtin the function and the transformed_function
+        original_exec_locals = {}
+        exec(ast.unparse(original_ast), {}, original_exec_locals)
+        temporary_function = original_exec_locals["function"]
+        temporary_exec_locals = {}
+        exec(ast.unparse(transformed_ast), {}, temporary_exec_locals)
+        temporary_transformed_function = temporary_exec_locals[
+            "transformed_function"
+        ]
 
-        importlib.reload(original_module)
-        temporary_function = original_module.function
-
-        # Save transformed like this too.
-        with open(
-            os.path.join(self.temporary_directory, "transformed_module.py"),
-            "w",
-        ) as f:
-            f.write(ast.unparse(transformed_ast))
-        import transformed_module
-
-        importlib.reload(transformed_module)
-        temporary_transformed_function = (
-            transformed_module.transformed_function
+        # Setup the profiler for both funstions and initialize the callbacks
+        sm.set_local_events(
+            sm.PROFILER_ID, temporary_function.__code__, sm.events.LINE
         )
+        sm.set_local_events(
+            sm.PROFILER_ID,
+            temporary_transformed_function.__code__,
+            sm.events.LINE,
+        )
+        original_callback = LineTraceCallback()
+        transformed_callback = LineTraceCallback()
 
-        # Setup tracers and run functions based on arguments, compare results
-        # of runs with same arguments to ensure original and transformed behave
-        # the same.
-        original_tracer = trace.Trace(trace=0, count=1)
-        transformed_tracer = trace.Trace(trace=0, count=1)
+        # Register the callbacks one at a time and collect results.
+        sm.register_callback(sm.PROFILER_ID, sm.events.LINE, original_callback)
         if arguments:
-            for a in arguments:
-                assert original_tracer.runfunc(
-                    temporary_function, *a
-                ) == transformed_tracer.runfunc(
-                    temporary_transformed_function, *a
-                )
+            original_results = [temporary_function(*a) for a in arguments]
         else:
-            assert original_tracer.runfunc(
-                temporary_function
-            ) == transformed_tracer.runfunc(temporary_transformed_function)
+            original_results = [temporary_function()]
 
-        # Make sure everything in the original was traced.
-        original_traced_lines = sorted(
-            [k[1] for k in original_tracer.results().counts.keys()]
+        # Only one callback can be registered at a time.
+        sm.register_callback(
+            sm.PROFILER_ID, sm.events.LINE, transformed_callback
         )
+        if arguments:
+            transformed_results = [
+                temporary_transformed_function(*a) for a in arguments
+            ]
+        else:
+            transformed_results = [temporary_transformed_function()]
+
+        # Check call results
+        assert original_results == transformed_results
+
+        # Check line trace of original
         original_source = ast.unparse(original_ast).splitlines()
         assert [
-            i + 1
-            for i, l in enumerate(original_source)
-            if not l.startswith("def") and "else:" not in l
-        ] == original_traced_lines
+           i + 1
+           for i, l in enumerate(original_source)
+           if not l.startswith("def") and "else:" not in l
+        ] == sorted(original_callback.lines)
 
-        # Make sure everything in the transformed was traced.
-        transformed_traced_lines = sorted(
-            [k[1] for k in transformed_tracer.results().counts.keys()]
-        )
+        # Check line trace of transformed
         transformed_source = ast.unparse(transformed_ast).splitlines()
         assert [
-            i + 1
-            for i, l in enumerate(transformed_source)
-            if not l.startswith("def") and "else:" not in l
-        ] == transformed_traced_lines
+           i + 1
+           for i, l in enumerate(transformed_source)
+           if not l.startswith("def") and "else:" not in l
+        ] == sorted(transformed_callback.lines)
 
     def setUp(self):
         # Enable pytest verbose output.
         self.maxDiff = None
-        # Create temporary directory to store code and append to PYTHONPATH.
-        self.temporary_directory = tempfile.mkdtemp()
-        sys.path.append(self.temporary_directory)
-
-    def tearDown(self):
-        # Invalidate importlib caches.
-        importlib.invalidate_caches()
-        # Remove the temporary directory from the PYTHONPATH and check that
-        # the correct path was removed.
-        assert sys.path.pop() == self.temporary_directory
-        # Finally remove the temporary directory again.
-        shutil.rmtree(self.temporary_directory)
 
     def test_solo_return(self):
         def function() -> int:
