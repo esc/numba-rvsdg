@@ -349,52 +349,52 @@ class TestAST2SCFGTransformer(TestCase):
 
     def test_nested_if_with_empty_else_and_return(self):
         def function(x: int, y: int) -> None:
-            y << 2
-            if x < 10:
+            z = 0
+            if x < 1:
                 y << 2
-                if y < 5:
-                    y = 1
+                if y < 1:
+                    z = 1
             else:
-                if y < 15:
-                    y = 2
+                if y < 2:
+                    z = 2
                 else:
-                    return 4
+                    return y, 4
                 y += 1
-            return y
+            return y, z
 
         expected = {
             "0": {
-                "instructions": ["y << 2", "x < 10"],
+                "instructions": ["z = 0", "x < 1"],
                 "jump_targets": ["1", "2"],
                 "name": "0",
             },
             "1": {
-                "instructions": ["y << 2", "y < 5"],
+                "instructions": ["y << 2", "y < 1"],
                 "jump_targets": ["4", "3"],
                 "name": "1",
             },
             "2": {
-                "instructions": ["y < 15"],
+                "instructions": ["y < 2"],
                 "jump_targets": ["7", "8"],
                 "name": "2",
             },
             "3": {
-                "instructions": ["return y"],
+                "instructions": ["return (y, z)"],
                 "jump_targets": [],
                 "name": "3",
             },
             "4": {
-                "instructions": ["y = 1"],
+                "instructions": ["z = 1"],
                 "jump_targets": ["3"],
                 "name": "4",
             },
             "7": {
-                "instructions": ["y = 2"],
+                "instructions": ["z = 2"],
                 "jump_targets": ["9"],
                 "name": "7",
             },
             "8": {
-                "instructions": ["return 4"],
+                "instructions": ["return (y, 4)"],
                 "jump_targets": [],
                 "name": "8",
             },
@@ -409,10 +409,10 @@ class TestAST2SCFGTransformer(TestCase):
             expected,
             empty={"5", "6"},
             arguments=[
-                (9, 4),
-                (9, 5),
-                (10, 14),
-                (10, 15),
+                (0, 0),
+                (0, 1),
+                (1, 1),
+                (1, 2),
             ],
         )
 
@@ -603,9 +603,9 @@ class TestAST2SCFGTransformer(TestCase):
         self.compare(function, expected, empty={"4", "7"})
 
     def test_while_in_if(self):
-        def function(a: int) -> int:
+        def function(y: int) -> int:
             x = 0
-            if a == 0:
+            if y == 0:
                 while x < 10:
                     x += 2
             else:
@@ -615,7 +615,7 @@ class TestAST2SCFGTransformer(TestCase):
 
         expected = {
             "0": {
-                "instructions": ["x = 0", "a == 0"],
+                "instructions": ["x = 0", "y == 0"],
                 "jump_targets": ["4", "8"],
                 "name": "0",
             },
@@ -744,15 +744,15 @@ class TestAST2SCFGTransformer(TestCase):
 
     def test_simple_for(self):
         def function() -> int:
-            c = 0
+            x = 0
             for i in range(10):
-                c += i
-            return c
+                x += i
+            return x, i
 
         expected = {
             "0": {
                 "instructions": [
-                    "c = 0",
+                    "x = 0",
                     "__iterator_1__ = iter(range(10))",
                     "i = None",
                 ],
@@ -769,7 +769,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "1",
             },
             "2": {
-                "instructions": ["c += i"],
+                "instructions": ["x += i"],
                 "jump_targets": ["1"],
                 "name": "2",
             },
@@ -779,7 +779,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "3",
             },
             "4": {
-                "instructions": ["return c"],
+                "instructions": ["return (x, i)"],
                 "jump_targets": [],
                 "name": "4",
             },
@@ -788,17 +788,17 @@ class TestAST2SCFGTransformer(TestCase):
 
     def test_nested_for(self):
         def function() -> int:
-            c = 0
+            x = 0
             for i in range(3):
-                c += i
+                x += i
                 for j in range(3):
-                    c += j
-            return c
+                    x += j
+            return x, i, j
 
         expected = {
             "0": {
                 "instructions": [
-                    "c = 0",
+                    "x = 0",
                     "__iterator_1__ = iter(range(3))",
                     "i = None",
                 ],
@@ -816,7 +816,7 @@ class TestAST2SCFGTransformer(TestCase):
             },
             "2": {
                 "instructions": [
-                    "c += i",
+                    "x += i",
                     "__iterator_5__ = iter(range(3))",
                     "j = None",
                 ],
@@ -829,7 +829,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "3",
             },
             "4": {
-                "instructions": ["return c"],
+                "instructions": ["return (x, i, j)"],
                 "jump_targets": [],
                 "name": "4",
             },
@@ -843,7 +843,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "5",
             },
             "6": {
-                "instructions": ["c += j"],
+                "instructions": ["x += j"],
                 "jump_targets": ["5"],
                 "name": "6",
             },
@@ -856,12 +856,12 @@ class TestAST2SCFGTransformer(TestCase):
         self.compare(function, expected, empty={"8"})
 
     def test_for_with_return_break_and_continue(self):
-        def function(a: int, b: int) -> int:
+        def function(x: int, y: int) -> int:
             for i in range(2):
-                if i == a:
+                if i == x:
                     i = 3
                     return i
-                elif i == b:
+                elif i == y:
                     i = 4
                     break
                 else:
@@ -887,7 +887,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "1",
             },
             "2": {
-                "instructions": ["i == a"],
+                "instructions": ["i == x"],
                 "jump_targets": ["5", "6"],
                 "name": "2",
             },
@@ -907,7 +907,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "5",
             },
             "6": {
-                "instructions": ["i == b"],
+                "instructions": ["i == y"],
                 "jump_targets": ["8", "1"],
                 "name": "6",
             },
@@ -926,21 +926,21 @@ class TestAST2SCFGTransformer(TestCase):
         )
 
     def test_for_with_if_in_else(self):
-        def function(a: int):
-            c = 0
+        def function(y: int):
+            x = 0
             for i in range(10):
-                c += i
+                x += i
             else:
-                if a:
-                    r = c
+                if y == 0:
+                    x += 10
                 else:
-                    r = -1 * c
-            return r
+                    x += 20
+            return (x, y, i)
 
         expected = {
             "0": {
                 "instructions": [
-                    "c = 0",
+                    "x = 0",
                     "__iterator_1__ = iter(range(10))",
                     "i = None",
                 ],
@@ -957,27 +957,27 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "1",
             },
             "2": {
-                "instructions": ["c += i"],
+                "instructions": ["x += i"],
                 "jump_targets": ["1"],
                 "name": "2",
             },
             "3": {
-                "instructions": ["i = __iter_last_1__", "a"],
+                "instructions": ["i = __iter_last_1__", "y == 0"],
                 "jump_targets": ["5", "6"],
                 "name": "3",
             },
             "4": {
-                "instructions": ["return r"],
+                "instructions": ["return (x, y, i)"],
                 "jump_targets": [],
                 "name": "4",
             },
             "5": {
-                "instructions": ["r = c"],
+                "instructions": ["x += 10"],
                 "jump_targets": ["4"],
                 "name": "5",
             },
             "6": {
-                "instructions": ["r = -1 * c"],
+                "instructions": ["x += 20"],
                 "jump_targets": ["4"],
                 "name": "6",
             },
@@ -985,28 +985,28 @@ class TestAST2SCFGTransformer(TestCase):
         self.compare(function, expected, empty={"7"}, arguments=[(0,), (1,)])
 
     def test_for_with_nested_for_else(self):
-        def function(a: int) -> int:
-            c = 1
+        def function(y: int) -> int:
+            x = 1
             for i in range(1):
                 for j in range(1):
-                    if a == 0:
-                        c *= 3
+                    if y == 0:
+                        x *= 3
                         break  # This break decides, if True skip continue.
                 else:
-                    c *= 5
+                    x *= 5
                     continue  # Causes break below to be skipped.
-                c *= 7
+                x *= 7
                 break  # Causes the else below to be skipped
             else:
-                c *= 9  # Not breaking in inner loop leads here
-            return c
+                x *= 9  # Not breaking in inner loop leads here
+            return x, y, i
 
-        self.assertEqual(function(1), 5 * 9)
-        self.assertEqual(function(0), 3 * 7)
+        self.assertEqual(function(1)[0], 5 * 9)
+        self.assertEqual(function(0)[0], 3 * 7)
         expected = {
             "0": {
                 "instructions": [
-                    "c = 1",
+                    "x = 1",
                     "__iterator_1__ = iter(range(1))",
                     "i = None",
                 ],
@@ -1031,12 +1031,12 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "2",
             },
             "3": {
-                "instructions": ["i = __iter_last_1__", "c *= 9"],
+                "instructions": ["i = __iter_last_1__", "x *= 9"],
                 "jump_targets": ["4"],
                 "name": "3",
             },
             "4": {
-                "instructions": ["return c"],
+                "instructions": ["return (x, y, i)"],
                 "jump_targets": [],
                 "name": "4",
             },
@@ -1050,22 +1050,22 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "5",
             },
             "6": {
-                "instructions": ["a == 0"],
+                "instructions": ["y == 0"],
                 "jump_targets": ["9", "5"],
                 "name": "6",
             },
             "7": {
-                "instructions": ["j = __iter_last_5__", "c *= 5"],
+                "instructions": ["j = __iter_last_5__", "x *= 5"],
                 "jump_targets": ["1"],
                 "name": "7",
             },
             "8": {
-                "instructions": ["c *= 7"],
+                "instructions": ["x *= 7"],
                 "jump_targets": ["4"],
                 "name": "8",
             },
             "9": {
-                "instructions": ["c *= 3"],
+                "instructions": ["x *= 3"],
                 "jump_targets": ["8"],
                 "name": "9",
             },
@@ -1076,32 +1076,32 @@ class TestAST2SCFGTransformer(TestCase):
         )
 
     def test_for_with_nested_else_return_break_and_continue(self):
-        def function(a: int) -> int:
+        def function(x: int) -> int:
             for i in range(2):
-                if a == 1:
+                if x == 1:
                     i += 1
                     return i
-                elif a == 2:
+                elif x == 2:
                     i += 2
                     break
-                elif a == 3:
+                elif x == 3:
                     i += 3
                     continue
                 else:
                     while i < 10:
                         i += 1
-                        if a == 4:
+                        if x == 4:
                             i += 4
                             return i
-                        elif a == 5:
+                        elif x == 5:
                             i += 5
                             break
-                        elif a == 6:
+                        elif x == 6:
                             i += 6
                             continue
                         else:
                             i += 7
-            return i
+            return x, i
 
         expected = {
             "0": {
@@ -1132,7 +1132,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "14",
             },
             "15": {
-                "instructions": ["i += 1", "a == 4"],
+                "instructions": ["i += 1", "x == 4"],
                 "jump_targets": ["18", "19"],
                 "name": "15",
             },
@@ -1142,12 +1142,12 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "18",
             },
             "19": {
-                "instructions": ["a == 5"],
+                "instructions": ["x == 5"],
                 "jump_targets": ["21", "22"],
                 "name": "19",
             },
             "2": {
-                "instructions": ["a == 1"],
+                "instructions": ["x == 1"],
                 "jump_targets": ["5", "6"],
                 "name": "2",
             },
@@ -1157,7 +1157,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "21",
             },
             "22": {
-                "instructions": ["a == 6"],
+                "instructions": ["x == 6"],
                 "jump_targets": ["24", "25"],
                 "name": "22",
             },
@@ -1177,7 +1177,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "3",
             },
             "4": {
-                "instructions": ["return i"],
+                "instructions": ["return (x, i)"],
                 "jump_targets": [],
                 "name": "4",
             },
@@ -1187,7 +1187,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "5",
             },
             "6": {
-                "instructions": ["a == 2"],
+                "instructions": ["x == 2"],
                 "jump_targets": ["8", "9"],
                 "name": "6",
             },
@@ -1197,7 +1197,7 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "8",
             },
             "9": {
-                "instructions": ["a == 3"],
+                "instructions": ["x == 3"],
                 "jump_targets": ["11", "14"],
                 "name": "9",
             },
