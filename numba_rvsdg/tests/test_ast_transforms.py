@@ -201,13 +201,13 @@ class TestAST2SCFGTransformer(TestCase):
 
     def test_if_return(self):
         def function(x: int) -> int:
-            if x < 10:
+            if x < 1:
                 return 1
             return 2
 
         expected = {
             "0": {
-                "instructions": ["x < 10"],
+                "instructions": ["x < 1"],
                 "jump_targets": ["1", "3"],
                 "name": "0",
             },
@@ -222,18 +222,18 @@ class TestAST2SCFGTransformer(TestCase):
                 "name": "3",
             },
         }
-        self.compare(function, expected, empty={"2"}, arguments=[(9,), (10,)])
+        self.compare(function, expected, empty={"2"}, arguments=[(0,), (1,)])
 
     def test_if_else_return(self):
         def function(x: int) -> int:
-            if x < 10:
+            if x < 1:
                 return 1
             else:
                 return 2
 
         expected = {
             "0": {
-                "instructions": ["x < 10"],
+                "instructions": ["x < 1"],
                 "jump_targets": ["1", "2"],
                 "name": "0",
             },
@@ -249,69 +249,31 @@ class TestAST2SCFGTransformer(TestCase):
             },
         }
         self.compare(
-            function, expected, unreachable={"3"}, arguments=[(9,), (10,)]
+            function, expected, unreachable={"3"}, arguments=[(0,), (1,)]
         )
 
     def test_if_else_assign(self):
         def function(x: int) -> int:
-            if x < 10:
-                z = 1
+            if x < 1:
+                y = 1
             else:
-                z = 2
-            return z
-
-        expected = {
-            "0": {
-                "instructions": ["x < 10"],
-                "jump_targets": ["1", "2"],
-                "name": "0",
-            },
-            "1": {
-                "instructions": ["z = 1"],
-                "jump_targets": ["3"],
-                "name": "1",
-            },
-            "2": {
-                "instructions": ["z = 2"],
-                "jump_targets": ["3"],
-                "name": "2",
-            },
-            "3": {
-                "instructions": ["return z"],
-                "jump_targets": [],
-                "name": "3",
-            },
-        }
-        self.compare(function, expected, arguments=[(9,), (10,)])
-
-    def test_nested_if(self):
-        def function(x: int, y: int) -> int:
-            if x < 10:
-                if y < 5:
-                    y = 1
-                else:
-                    y = 2
-            else:
-                if y < 15:
-                    y = 3
-                else:
-                    y = 4
+                y = 2
             return y
 
         expected = {
             "0": {
-                "instructions": ["x < 10"],
+                "instructions": ["x < 1"],
                 "jump_targets": ["1", "2"],
                 "name": "0",
             },
             "1": {
-                "instructions": ["y < 5"],
-                "jump_targets": ["4", "5"],
+                "instructions": ["y = 1"],
+                "jump_targets": ["3"],
                 "name": "1",
             },
             "2": {
-                "instructions": ["y < 15"],
-                "jump_targets": ["7", "8"],
+                "instructions": ["y = 2"],
+                "jump_targets": ["3"],
                 "name": "2",
             },
             "3": {
@@ -319,23 +281,61 @@ class TestAST2SCFGTransformer(TestCase):
                 "jump_targets": [],
                 "name": "3",
             },
+        }
+        self.compare(function, expected, arguments=[(0,), (1,)])
+
+    def test_nested_if(self):
+        def function(x: int, y: int) -> int:
+            if x < 1:
+                if y < 1:
+                    z = 1
+                else:
+                    z = 2
+            else:
+                if y < 2:
+                    z = 3
+                else:
+                    z = 4
+            return z
+
+        expected = {
+            "0": {
+                "instructions": ["x < 1"],
+                "jump_targets": ["1", "2"],
+                "name": "0",
+            },
+            "1": {
+                "instructions": ["y < 1"],
+                "jump_targets": ["4", "5"],
+                "name": "1",
+            },
+            "2": {
+                "instructions": ["y < 2"],
+                "jump_targets": ["7", "8"],
+                "name": "2",
+            },
+            "3": {
+                "instructions": ["return z"],
+                "jump_targets": [],
+                "name": "3",
+            },
             "4": {
-                "instructions": ["y = 1"],
+                "instructions": ["z = 1"],
                 "jump_targets": ["3"],
                 "name": "4",
             },
             "5": {
-                "instructions": ["y = 2"],
+                "instructions": ["z = 2"],
                 "jump_targets": ["3"],
                 "name": "5",
             },
             "7": {
-                "instructions": ["y = 3"],
+                "instructions": ["z = 3"],
                 "jump_targets": ["3"],
                 "name": "7",
             },
             "8": {
-                "instructions": ["y = 4"],
+                "instructions": ["z = 4"],
                 "jump_targets": ["3"],
                 "name": "8",
             },
@@ -344,7 +344,7 @@ class TestAST2SCFGTransformer(TestCase):
             function,
             expected,
             empty={"6", "9"},
-            arguments=[(9, 4), (9, 5), (10, 14), (10, 15)],
+            arguments=[(0, 0), (0, 1), (1, 1), (1, 2)],
         )
 
     def test_nested_if_with_empty_else_and_return(self):
