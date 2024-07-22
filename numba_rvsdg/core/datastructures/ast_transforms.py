@@ -5,6 +5,7 @@ from typing import Callable, Any, MutableMapping
 import textwrap
 from dataclasses import dataclass
 from collections import defaultdict
+from typing import Sequence, cast
 
 from numba_rvsdg.core.datastructures.scfg import SCFG
 from numba_rvsdg.core.datastructures.basic_block import (
@@ -21,8 +22,8 @@ from numba_rvsdg.core.datastructures.basic_block import (
 
 
 def unparse_code(
-    code: str | list[ast.FunctionDef] | Callable[..., Any]
-) -> list[type[ast.AST]]:
+    code: str | Sequence[ast.FunctionDef] | Callable[..., Any]
+) -> Sequence[ast.AST]:
     # Convert source code into AST.
     if isinstance(code, str):
         tree = ast.parse(code).body
@@ -33,11 +34,11 @@ def unparse_code(
         and len(code) > 0
         and all([isinstance(i, ast.AST) for i in code])
     ):
-        tree = code  # type: ignore
+        tree = code
     else:
         msg = "Type: '{type(self.code}}' is not implemented."
         raise NotImplementedError(msg)
-    return tree  # type: ignore
+    return tree
 
 
 class WritableASTBlock:
@@ -230,8 +231,8 @@ class AST2SCFGTransformer:
     # Prune noop statements and unreachable/empty blocks from the CFG.
     prune: bool
     # The code to be transformed.
-    code: str | list[ast.FunctionDef] | Callable[..., Any]
-    tree: list[type[ast.AST]]
+    code: str | Sequence[ast.FunctionDef] | Callable[..., Any]
+    tree: Sequence[ast.AST]
     # Monotonically increasing block index, starts at 1.
     block_index: int
     # The current block being modified
@@ -244,7 +245,7 @@ class AST2SCFGTransformer:
 
     def __init__(
         self,
-        code: str | list[ast.FunctionDef] | Callable[..., Any],
+        code: str | Sequence[ast.FunctionDef] | Callable[..., Any],
         prune: bool = True,
     ) -> None:
         self.prune = prune
@@ -297,7 +298,7 @@ class AST2SCFGTransformer:
             _ = self.blocks.prune_noops()
             _ = self.blocks.prune_empty()
 
-    def codegen(self, tree: list[type[ast.AST]] | list[ast.stmt]) -> None:
+    def codegen(self, tree: Sequence[ast.AST]) -> None:
         """Recursively transform from a list of AST nodes.
 
         The function is called 'codegen' as it generates an intermediary
@@ -309,7 +310,7 @@ class AST2SCFGTransformer:
         for node in tree:
             self.handle_ast_node(node)
 
-    def handle_ast_node(self, node: type[ast.AST] | ast.stmt) -> None:
+    def handle_ast_node(self, node: ast.AST) -> None:
         """Dispatch an AST node to handle."""
         if isinstance(node, ast.FunctionDef):
             self.handle_function_def(node)
@@ -679,15 +680,15 @@ class SCFG2ASTTransformer:
             if type(block) is RegionBlock and block.kind == "branch":
                 continue
             body.extend(self.codegen(block))
-        fdef = ast.FunctionDef(
+        fdef: ast.FunctionDef = ast.FunctionDef(
             name="transformed_function",
             args=original.args,
-            body=body,
+            body=cast(list[ast.stmt], body),
             lineno=0,
             decorator_list=original.decorator_list,
             returns=original.returns,
         )  # type: ignore
-        return fdef  # type: ignore
+        return fdef
 
     def lookup(self, item: Any) -> Any:
         subregion_scfg = self.region_stack[-1].subregion
@@ -705,7 +706,7 @@ class SCFG2ASTTransformer:
         else:
             raise KeyError(f"Item {item} not found in subregion or parent")
 
-    def codegen(self, block: Any) -> list[ast.AST]:
+    def codegen(self, block: Any) -> Sequence[ast.AST]:
         if type(block) is PythonASTBlock:
             if len(block.jump_targets) == 2:
                 if type(block.tree[-1]) in (ast.Name, ast.Compare):
@@ -824,7 +825,7 @@ class SCFG2ASTTransformer:
                 reverse[jump_target].append(variable_value)
             # recursive generation of if-cascade
 
-            def if_cascade(jump_targets: list[str]) -> list[ast.AST]:
+            def if_cascade(jump_targets: list[str]) -> Sequence[ast.AST]:
                 if len(jump_targets) == 1:
                     # base case, final else
                     return self.codegen(self.lookup(jump_targets.pop()))
@@ -850,9 +851,9 @@ class SCFG2ASTTransformer:
                     # recurse for the rest of the jump_targets.
                     if_node = ast.If(
                         test=if_test,
-                        body=self.codegen(
-                            self.lookup(current)
-                        ),  # type: ignore
+                        body=cast(
+                            list[ast.stmt], self.codegen(self.lookup(current))
+                        ),
                         orelse=if_cascade(jump_targets),  # type: ignore
                     )
                     return [if_node]
@@ -875,7 +876,5 @@ def SCFG2AST(
 ) -> ast.FunctionDef:
     """Transform SCFG with PythonASTBlocks into an AST FunctionDef defined in
     code."""
-    original_ast = unparse_code(code)[0]
-    return SCFG2ASTTransformer().transform(
-        original=original_ast, scfg=scfg  # type: ignore
-    )
+    original_ast = cast(ast.FunctionDef, unparse_code(code)[0])
+    return SCFG2ASTTransformer().transform(original=original_ast, scfg=scfg)
