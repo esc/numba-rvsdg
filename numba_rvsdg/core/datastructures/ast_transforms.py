@@ -133,7 +133,7 @@ class ASTCFG(dict[str, WritableASTBlock]):
 
     unreachable: set[WritableASTBlock]
     empty: set[WritableASTBlock]
-    noops: set[type[ast.AST]]
+    noops: set[ast.AST]
 
     def convert_blocks(self) -> MutableMapping[str, Any]:
         """Convert WritableASTBlocks to PythonASTBlocks."""
@@ -173,9 +173,9 @@ class ASTCFG(dict[str, WritableASTBlock]):
         self.unreachable = unreachable
         return unreachable
 
-    def prune_noops(self) -> set[type[ast.AST]]:
+    def prune_noops(self) -> set[ast.AST]:
         """Prune no-op instructions from the CFG."""
-        noops = set()
+        noops: set[ast.AST] = set()
         exclude = (ast.Pass, ast.Continue, ast.Break)
         for block in self.values():
             block.instructions = [
@@ -184,8 +184,8 @@ class ASTCFG(dict[str, WritableASTBlock]):
             noops.update(
                 [i for i in block.instructions if isinstance(i, exclude)]
             )
-        self.noops = noops  # type: ignore
-        return noops  # type: ignore
+        self.noops = noops
+        return noops
 
     def prune_empty(self) -> set[WritableASTBlock]:
         """Prune empty blocks from the CFG."""
