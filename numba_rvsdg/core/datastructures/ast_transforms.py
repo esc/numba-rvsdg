@@ -1,11 +1,10 @@
 import ast
 import inspect
 import itertools
-from typing import Callable, Any, MutableMapping
+from typing import Callable, Any, MutableMapping, Sequence, cast
 import textwrap
 from dataclasses import dataclass
 from collections import defaultdict
-from typing import Sequence, cast
 
 from numba_rvsdg.core.datastructures.scfg import SCFG
 from numba_rvsdg.core.datastructures.basic_block import (
